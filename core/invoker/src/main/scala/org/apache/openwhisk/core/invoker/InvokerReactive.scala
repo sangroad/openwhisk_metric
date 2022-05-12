@@ -140,6 +140,12 @@ class InvokerReactive(
 
   private val collectLogs = new LogStoreCollector(logsProvider)
 
+  // pickme
+  private val periodicMonitor = actorSystem.actorOf(Props {
+    new PeriodicMonitor()
+  })
+  actorSystem.scheduler.schedule(0.second, 30.millisecond, periodicMonitor, Tick())
+
   /** Stores an activation in the database. */
   private val store = (tid: TransactionId, activation: WhiskActivation, isBlocking: Boolean, context: UserContext) => {
     implicit val transid: TransactionId = tid
@@ -221,7 +227,15 @@ class InvokerReactive(
 
   /** Is called when an ActivationMessage is read from Kafka */
   def processActivationMessage(bytes: Array[Byte]): Future[Unit] = {
-    Future(ActivationMessage.parse(new String(bytes, StandardCharsets.UTF_8)))
+    // pickme
+    val msg = new String(bytes, StandardCharsets.UTF_8).split("@")
+    val activationMsg = msg(0)
+    if (msg.length > 1) {
+      val queueLen = msg(1).toLong
+      PICKMEBackgroundMonitor.addQueueLen(queueLen)
+    }
+
+    Future(ActivationMessage.parse(activationMsg))
       .flatMap(Future.fromTry)
       .flatMap { msg =>
         // The message has been parsed correctly, thus the following code needs to *always* produce at least an

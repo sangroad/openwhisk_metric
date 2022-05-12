@@ -301,6 +301,11 @@ class ContainerProxy(factory: (TransactionId,
     case Event(job: Run, _) =>
       implicit val transid = job.msg.transid
       activeCount += 1
+
+      // pickme
+      val sTime = System.nanoTime()
+      ContainerProxy.creating.next()
+
       // create a new container
       val container = factory(
         job.msg.transid,
@@ -346,6 +351,8 @@ class ContainerProxy(factory: (TransactionId,
             storeActivation(transid, activation, job.msg.blocking, context)
         }
         .flatMap { container =>
+          // pickme
+          PICKMEBackgroundMonitor.setCreatingContainer(ContainerProxy.creating.prev())
           // now attempt to inject the user code and run the action
           initializeAndRun(container, job)
             .map(_ => RunCompleted)
@@ -668,6 +675,16 @@ class ContainerProxy(factory: (TransactionId,
                        abort: Boolean = false,
                        abortResponse: Option[ActivationResponse] = None) = {
     val container = newData.container
+
+    // pickme
+    newData match {
+      case WarmedData(container, invocationNamespace, action, lastUsed, activeActivationCount, resumeRun) =>
+        PICKMEBackgroundMonitor.shrinking(action.name.toString)
+      case WarmingData(container, invocationNamespace, action, lastUsed, activeActivationCount) =>
+        PICKMEBackgroundMonitor.shrinking(action.name.toString)
+      case PreWarmedData(container, kind, memoryLimit, activeActivationCount, expires) =>
+    }
+
     if (!rescheduleJob) {
       context.parent ! ContainerRemoved(replacePrewarm)
     } else {
@@ -774,6 +791,11 @@ class ContainerProxy(factory: (TransactionId,
    */
   def initializeAndRun(container: Container, job: Run, reschedule: Boolean = false)(
     implicit tid: TransactionId): Future[WhiskActivation] = {
+    
+    // pickme
+    val sTime = System.nanoTime()
+    ContainerProxy.initializing.next()
+
     val actionTimeout = job.action.limits.timeout.duration
     val unlockedArgs =
       ContainerProxy.unlockArguments(job.msg.content, job.msg.lockedArgs, ParameterEncryption.singleton)
@@ -804,6 +826,8 @@ class ContainerProxy(factory: (TransactionId,
           "deadline" -> (Instant.now.toEpochMilli + actionTimeout.toMillis).toString.toJson)) map {
           case (key, value) => "__OW_" + key.toUpperCase -> value
         }
+        val initData = job.action.containerInitializer((env ++ owEnv))
+        logging.info(this, s"[pickme] initData's size: ${initData.toString().size}")
 
         container
           .initialize(
@@ -826,6 +850,10 @@ class ContainerProxy(factory: (TransactionId,
           // but potentially under-estimates actual deadline
           "deadline" -> (Instant.now.toEpochMilli + actionTimeout.toMillis).toString.toJson)
 
+        // logging.info(this, s"[pickme] initalize ~ run: ${(System.nanoTime - sTime) / 1000000}ms, concurrent running: ${ContainerProxy.initializing.prev()}")
+        PICKMEBackgroundMonitor.setInitContainer(ContainerProxy.initializing.prev())
+        PICKMEActivationMonitor.setActivationInputSize(FuncInputSize(job.msg.activationId, parameters.toString().size))
+        logging.info(this, s"[pickme] param size: ${parameters.toString().size}")
         container
           .run(
             parameters,
@@ -919,15 +947,18 @@ class ContainerProxy(factory: (TransactionId,
         // (result is received before the completion message for blocking invokes).
         if (splitAckMessagesPendingLogCollection) {
           sendResult.onComplete(
-            _ =>
+            _ => {
+              logging.info(this, s"[pickme] ${activation.activationId} duration: ${activation.duration.get}")
+              PICKMEActivationMonitor.setActivationDuration(FuncDuration(activation.activationId, activation.duration.get))
               sendActiveAck(
                 tid,
                 activation,
                 job.msg.blocking,
                 job.msg.rootControllerIndex,
                 job.msg.user.namespace.uuid,
-                CompletionMessage(tid, activation, instance)))
-        }
+                CompletionMessage(tid, activation, instance))
+            })
+       }
         storeActivation(tid, activation, job.msg.blocking, context)
       }
 
@@ -1004,6 +1035,8 @@ object ContainerProxy {
 
   // Needs to be thread-safe as it's used by multiple proxies concurrently.
   private val containerCount = new Counter
+  private val initializing = new Counter
+  private val creating = new Counter
 
   val timeouts = loadConfigOrThrow[ContainerProxyTimeoutConfig](ConfigKeys.containerProxyTimeouts)
   val activationErrorLogging =

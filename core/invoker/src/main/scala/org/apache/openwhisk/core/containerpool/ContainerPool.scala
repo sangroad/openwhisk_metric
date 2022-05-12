@@ -165,6 +165,21 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 
           } else None
 
+        // pickme
+        createdContainer match {
+          case Some(((actor, data), containerState)) =>
+            containerState match {
+							case "prewarmed" | "cold" | "recreated" | "recreatedPrewarm" =>
+								// PICKMEBackgroundMonitor.addFunction(r.action.name.toString, r.action.limits.memory.megabytes.toInt)
+								PICKMEActivationMonitor.setActivationColdWarm(FuncInitialData(r.msg.activationId, r.action.name, "cold"))
+							case _ =>
+								// PICKMEBackgroundMonitor.warmHit(r.action.name.toString)
+								PICKMEActivationMonitor.setActivationColdWarm(FuncInitialData(r.msg.activationId, r.action.name, "warm"))
+            }
+          case None =>
+        }
+
+
         createdContainer match {
           case Some(((actor, data), containerState)) =>
             //increment active count before storing in pool map
@@ -199,6 +214,17 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
             }
             actor ! r // forwards the run request to the container
             logContainerStart(r, containerState, newData.activeActivationCount, container)
+
+						// pickme
+						// functionSocketServer ! ByteString("*2@" + busyPool.count(z=>true).toString)
+						PICKMEBackgroundMonitor.setBusyPoolSize(busyPool.size)
+						PICKMEBackgroundMonitor.setFreePoolSize(freePool.size)
+						// PICKMEBackgroundMonitor.shrinkList.foreach { x =>
+							// PICKMEBackgroundMonitor.shrinkFunction(x)
+							// functionSocketServer ! ByteString("*3@" + x)
+							// PICKMEBackgroundMonitor.shrinkList -= x
+						// }
+
           case None =>
             // this can also happen if createContainer fails to start a new container, or
             // if a job is rescheduled but the container it was allocated to has not yet destroyed itself
@@ -255,6 +281,17 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         freePool = freePool - sender()
       }
       processBufferOrFeed()
+
+			// pickme
+			// functionSocketServer ! ByteString("*2@" + busyPool.count(z=>true).toString)
+			PICKMEBackgroundMonitor.setBusyPoolSize(busyPool.size)
+			PICKMEBackgroundMonitor.setFreePoolSize(freePool.size)
+			// PICKMEBackgroundMonitor.shrinkList.foreach { x =>
+				// PICKMEBackgroundMonitor.shrinkFunction(x)
+			  // functionSocketServer ! ByteString("*3@" + x)
+			  // PICKMEBackgroundMonitor.shrinkList -= x
+			// }
+
     // Container is prewarmed and ready to take work
     case NeedWork(data: PreWarmedData) =>
       prewarmStartingPool = prewarmStartingPool - sender()
@@ -287,6 +324,18 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
       if (replacePrewarm) {
         adjustPrewarmedContainer(false, false) //in case a prewarm is removed due to health failure or crash
       }
+
+			// pickme
+      // PICKMEBackgroundMonitor.updateBusyFunc(busyPool.count(z=>true))
+      // PICKMEBackgroundMonitor.updateFreeFunc(freePool.size)
+			PICKMEBackgroundMonitor.setBusyPoolSize(busyPool.size)
+			PICKMEBackgroundMonitor.setFreePoolSize(freePool.size)
+			// functionSocketServer ! ByteString("*2@" + busyPool.count(z=>true).toString)
+			// PICKMEBackgroundMonitor.shrinkList.foreach { x =>
+				// PICKMEBackgroundMonitor.shrinkFunction(x)
+				// functionSocketServer ! ByteString("*3@" + x)
+				// PICKMEBackgroundMonitor.shrinkList -= x
+			// }
 
     // This message is received for one of these reasons:
     // 1. Container errored while resuming a warm container, could not process the job, and sent the job back

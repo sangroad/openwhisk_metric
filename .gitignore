@@ -86,6 +86,8 @@ intellij-run-config.groovy
 
 # VSCode
 .vscode/
+.bloop/
+.metals/
 
 # route management
 core/routemgmt/createApi/apigw-utils.js
