@@ -9,7 +9,5 @@ class PeriodicMonitor extends Actor {
 	def receive: Receive = {
 		case t: Tick =>
 			PICKMEBackgroundMonitor.calQueueLen()
-			PICKMEBackgroundMonitor.readCpuUtil()
-			PICKMEBackgroundMonitor.readMemUtil()
 	}
 }

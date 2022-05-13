@@ -850,6 +850,7 @@ class ContainerProxy(factory: (TransactionId,
           // but potentially under-estimates actual deadline
           "deadline" -> (Instant.now.toEpochMilli + actionTimeout.toMillis).toString.toJson)
 
+        // pickme
         // logging.info(this, s"[pickme] initalize ~ run: ${(System.nanoTime - sTime) / 1000000}ms, concurrent running: ${ContainerProxy.initializing.prev()}")
         PICKMEBackgroundMonitor.setInitContainer(ContainerProxy.initializing.prev())
         PICKMEActivationMonitor.setActivationInputSize(FuncInputSize(job.msg.activationId, parameters.toString().size))
@@ -948,7 +949,7 @@ class ContainerProxy(factory: (TransactionId,
         if (splitAckMessagesPendingLogCollection) {
           sendResult.onComplete(
             _ => {
-              logging.info(this, s"[pickme] ${activation.activationId} duration: ${activation.duration.get}")
+              // pickme
               PICKMEActivationMonitor.setActivationDuration(FuncDuration(activation.activationId, activation.duration.get))
               sendActiveAck(
                 tid,

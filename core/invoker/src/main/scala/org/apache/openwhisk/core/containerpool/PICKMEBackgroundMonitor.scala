@@ -4,8 +4,8 @@ package org.apache.openwhisk.core.containerpool
 import scala.collection.mutable.Map
 import scala.collection.mutable.ListBuffer
 
-case class PICKMEBackgroundMetric (cpu: Long, mem: Long, ipc: Long, queueLen: Long, busyPoolSize: Int,
-																	freePoolSize: Int, initContainer: Long, creatingContainer: Long)
+case class PICKMEBackgroundMetric (avgCpu: Long, maxCpu: Long, minCpu: Long, midCpu: Long, mem: Long, ipc: Float, queueLen: Long,
+																	busyPoolSize: Int, freePoolSize: Int, initContainer: Long, creatingContainer: Long)
 
 class PICKMEBackgroundMonitor {
 	var funcBundle = Map.empty[String, (Int, Int, Int)]
@@ -27,13 +27,16 @@ class PICKMEBackgroundMonitor {
 	var queueLen: Long = 0
 
 	// for cpu
-	var cpuUtil: Long = 0
+	var avgCpu: Long = 0
+	var maxCpu: Long = 0
+	var minCpu: Long = 0
+	var midCpu: Long = 0
 
 	// for memory
 	var memUtil: Long = 0
 
 	// for IPC
-	var IPC: Long = 0
+	var IPC: Float = 0
 
 	// init containers, creating containers
 	var initContainerNum: Long = 0
@@ -47,7 +50,8 @@ object PICKMEBackgroundMonitor {
 	var shrinkList = new ListBuffer[String]()
 
 	def getCurrentStatus() = {
-		PICKMEBackgroundMetric(collector.cpuUtil, collector.memUtil, collector.IPC, collector.queueLen, collector.busyPoolSize, collector.freePoolSize,
+		PICKMEBackgroundMetric(collector.avgCpu, collector.maxCpu, collector.minCpu, collector.midCpu, collector.memUtil, collector.IPC,
+		collector.queueLen, collector.busyPoolSize, collector.freePoolSize,
 		collector.initContainerNum, collector.creatingContainerNum)
 	}
 
@@ -74,16 +78,6 @@ object PICKMEBackgroundMonitor {
 	def calQueueLen() = {
 		collector.queueLen = collector.curQueueLen - collector.prevQueueLen
 		collector.prevQueueLen = collector.curQueueLen
-	}
-
-	// read cpu util from file
-	def readCpuUtil() = {
-
-	}
-
-	// read memory util from file
-	def readMemUtil() = {
-
 	}
 
 	def addFunction(name: String, memory: Int) = {
