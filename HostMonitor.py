@@ -3,6 +3,7 @@ import numpy as np
 import threading
 import subprocess
 import time
+import csv
 from multiprocess import Process
 
 HOST = "127.0.0.1"
@@ -12,6 +13,8 @@ MSG_SIZE = 2048
 
 MON_PERIOD = 0.03	# second
 NUM_CORES = 20
+
+FILE_PATH = None
 
 def read_cpu_ns():
 	with open("/sys/fs/cgroup/cpu/docker/cpuacct.usage_percpu", "r") as f:
@@ -59,9 +62,11 @@ def monitor_ipc():
 
 def monitor(sock):
 	while True:
-		start = time.time()
 		prev_util = read_cpu_ns()
+
+		# spends MON_PERIOD of time
 		ipc = monitor_ipc()
+
 		cur_util = read_cpu_ns()
 		cpu_met = get_cpu_util_metrics(cur_util, prev_util)
 
@@ -72,7 +77,6 @@ def monitor(sock):
 			res += str(m) + "@"
 		
 		res = res + str(mem_util) + "@" + str(ipc)
-		# print(res)
 		ow_send_metrics(res, sock)
 
 def con_socket():
@@ -83,14 +87,37 @@ def con_socket():
 def ow_get_metrics(sock):
 	while True:
 		data = sock.recv(MSG_SIZE)
-		print("received: %s" % repr(data.decode()))
+		decoded = decode_data_from_ow(data.decode())
+
+		for d in decoded:
+			if len(d) != 0:
+				log_data(d)
+
+def log_data(data):
+	with open(FILE_PATH, "a") as f:
+		wr = csv.writer(f)
+		row = data.split("@")
+		wr.writerow(row)
 
 def ow_send_metrics(metric, sock):
 	sock.send(metric.encode())
 
+def decode_data_from_ow(data):
+	metrics = data.split("*")
+	return metrics
+
+def prepare_logging():
+	global FILE_PATH
+	FILE_PATH = time.strftime("%m%d_%H%M") + ".csv"
+	FILE_PATH = "./mon_data/" + FILE_PATH
+
+	with open(FILE_PATH, "w") as f:
+		wr = csv.writer(f)
+		wr.writerow(["activation id", "action name", "cold/warm", "duration", "avgCPU", "maxCPU", "minCPU", "midCPU", 
+		"mem", "IPC", "busyPoolSize", "freePoolSize", "queueLength", "initContainers", "creatingContainers", "inputSize"])
 
 if __name__ == "__main__":
-
+	prepare_logging()
 	sock = con_socket()
 
 	procs = []

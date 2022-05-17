@@ -950,7 +950,10 @@ class ContainerProxy(factory: (TransactionId,
           sendResult.onComplete(
             _ => {
               // pickme
-              PICKMEActivationMonitor.setActivationDuration(FuncDuration(activation.activationId, activation.duration.get))
+              val waitTime = activation.annotations.get("waitTime")
+              val initTime = activation.annotations.get("initTime")
+              PICKMEActivationMonitor.setActivationDuration(FuncDuration(activation.activationId, activation.duration.get,
+              waitTime, initTime))
               sendActiveAck(
                 tid,
                 activation,

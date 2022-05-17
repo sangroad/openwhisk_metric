@@ -9,14 +9,17 @@ class PICKMEMetric (backgroundMetric: PICKMEBackgroundMetric) {
 	var actionName: String = ""
 	var status: String = ""
 	var inputSize: Int = 0
+
 	var duration: Long = 0
+	var waitTime: String = ""
+	var initTime: String = ""
 
 	def getBackgroundMetric() = backgroundMetric
 }
 
 case class FuncInitialData (activationId: ActivationId, actionName: EntityName, containerType: String)
 case class FuncInputSize (activationId: ActivationId, inputSize: Int)
-case class FuncDuration (activationId: ActivationId, duration: Long)
+case class FuncDuration (activationId: ActivationId, duration: Long, waitTime: Option[spray.json.JsValue], initTime: Option[spray.json.JsValue])
 case class PICKMESocketData (activationId: ActivationId, metric: PICKMEMetric)
 
 class PICKMEActivationMonitor {
@@ -51,6 +54,20 @@ object PICKMEActivationMonitor {
 		if (metric.isDefined) {
 			val storedMetric = metric.get
 			storedMetric.duration = duration.duration
+			
+			if (duration.initTime.isDefined) {
+				storedMetric.initTime = duration.initTime.get.toString()
+			}
+			else {
+				storedMetric.initTime = "X"
+			}
+
+			if (duration.waitTime.isDefined) {
+				storedMetric.waitTime = duration.waitTime.get.toString()
+			}
+			else {
+				storedMetric.waitTime = "X"
+			}
 			// PICKMEActivationMonitor.activations.update(duration.activationId, storedMetric)
 
 			// send socket

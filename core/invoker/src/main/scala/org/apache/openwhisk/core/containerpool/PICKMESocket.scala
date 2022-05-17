@@ -27,8 +27,8 @@ class PICKMESocketServer extends Actor {
         case data: PICKMESocketData =>
           val metric = data.metric
           val bgMetric = metric.getBackgroundMetric()
-          val strData = s"*${data.activationId}@${metric.actionName}@${metric.status}@${metric.duration}@${bgMetric.avgCpu}" +
-            s"@${bgMetric.maxCpu}@${bgMetric.minCpu}@${bgMetric.midCpu}@${bgMetric.mem}@${bgMetric.ipc}" +
+          val strData = s"*${data.activationId}@${metric.actionName}@${metric.status}@${metric.duration}@${metric.waitTime}@${metric.initTime}" +
+            s"@${bgMetric.avgCpu}@${bgMetric.maxCpu}@${bgMetric.minCpu}@${bgMetric.midCpu}@${bgMetric.mem}@${bgMetric.ipc}" +
             s"@${bgMetric.busyPoolSize}@${bgMetric.freePoolSize}@${bgMetric.queueLen}@${bgMetric.initContainer}" +
             s"@${bgMetric.creatingContainer}@${metric.inputSize}"
 
