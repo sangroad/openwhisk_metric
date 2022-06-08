@@ -1039,8 +1039,8 @@ object ContainerProxy {
 
   // Needs to be thread-safe as it's used by multiple proxies concurrently.
   private val containerCount = new Counter
-  private val initializing = new Counter
-  private val creating = new Counter
+  val initializing = new Counter
+  val creating = new Counter
 
   val timeouts = loadConfigOrThrow[ContainerProxyTimeoutConfig](ConfigKeys.containerProxyTimeouts)
   val activationErrorLogging =

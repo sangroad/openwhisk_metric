@@ -21,6 +21,7 @@ case class FuncInitialData (activationId: ActivationId, actionName: EntityName, 
 case class FuncInputSize (activationId: ActivationId, inputSize: Int)
 case class FuncDuration (activationId: ActivationId, duration: Long, waitTime: Option[spray.json.JsValue], initTime: Option[spray.json.JsValue])
 case class PICKMESocketData (activationId: ActivationId, metric: PICKMEMetric)
+case class PICKMEPeriodicData (busyPoolSize: Long, freePoolSize: Long, initContainers: Long, creatingContainers: Long)
 
 class PICKMEActivationMonitor {
 

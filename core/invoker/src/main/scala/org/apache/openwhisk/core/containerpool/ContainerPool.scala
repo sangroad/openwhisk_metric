@@ -18,7 +18,7 @@
 package org.apache.openwhisk.core.containerpool
 
 import akka.actor.{Actor, ActorRef, ActorRefFactory, Props}
-import org.apache.openwhisk.common.{Logging, LoggingMarkers, MetricEmitter, TransactionId}
+import org.apache.openwhisk.common.{Logging, LoggingMarkers, MetricEmitter, TransactionId, Counter}
 import org.apache.openwhisk.core.connector.MessageFeed
 import org.apache.openwhisk.core.entity.ExecManifest.ReactivePrewarmingConfig
 import org.apache.openwhisk.core.entity._
@@ -199,9 +199,14 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
               }
               busyPool = busyPool + (actor -> newData)
               freePool = freePool - actor
+              // pickme
+              ContainerPool.busyPoolSize.next()
+              ContainerPool.freePoolSize.prev()
             } else {
               //update freePool to track counts
               freePool = freePool + (actor -> newData)
+              // pickme
+              ContainerPool.freePoolSize.next()
             }
             // Remove the action that was just executed from the buffer and execute the next one in the queue.
             if (isResentFromBuffer) {
@@ -219,6 +224,9 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 						// functionSocketServer ! ByteString("*2@" + busyPool.count(z=>true).toString)
 						PICKMEBackgroundMonitor.setBusyPoolSize(busyPool.size)
 						PICKMEBackgroundMonitor.setFreePoolSize(freePool.size)
+
+            logging.debug(this, s"[pickme] default busypool size: ${busyPool.size}. handmade busypool size: ${ContainerPool.busyPoolSize.cur}")
+            logging.debug(this, s"[pickme] default freepool size: ${freePool.size}. handmade freepool size: ${ContainerPool.freePoolSize.cur}")
 						// PICKMEBackgroundMonitor.shrinkList.foreach { x =>
 							// PICKMEBackgroundMonitor.shrinkFunction(x)
 							// functionSocketServer ! ByteString("*3@" + x)
@@ -268,8 +276,12 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
       if (newData.hasCapacity()) {
         //remove from busy pool (may already not be there), put back into free pool (to update activation counts)
         freePool = freePool + (sender() -> newData)
+        // pickme
+        ContainerPool.freePoolSize.next()
         if (busyPool.contains(sender())) {
           busyPool = busyPool - sender()
+          // pickme
+          ContainerPool.busyPoolSize.prev()
           if (newData.action.limits.concurrency.maxConcurrent > 1) {
             logging.info(
               this,
@@ -279,6 +291,10 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
       } else {
         busyPool = busyPool + (sender() -> newData)
         freePool = freePool - sender()
+
+        // pickme
+        ContainerPool.busyPoolSize.next()
+        ContainerPool.freePoolSize.prev()
       }
       processBufferOrFeed()
 
@@ -286,6 +302,10 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 			// functionSocketServer ! ByteString("*2@" + busyPool.count(z=>true).toString)
 			PICKMEBackgroundMonitor.setBusyPoolSize(busyPool.size)
 			PICKMEBackgroundMonitor.setFreePoolSize(freePool.size)
+
+      // pickme
+      logging.debug(this, s"[pickme] default busypool size: ${busyPool.size}. handmade busypool size: ${ContainerPool.busyPoolSize.cur}")
+      logging.debug(this, s"[pickme] default freepool size: ${freePool.size}. handmade freepool size: ${ContainerPool.freePoolSize.cur}")
 			// PICKMEBackgroundMonitor.shrinkList.foreach { x =>
 				// PICKMEBackgroundMonitor.shrinkFunction(x)
 			  // functionSocketServer ! ByteString("*3@" + x)
@@ -303,10 +323,14 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
       // so there is capacity to accept another job request
       freePool.get(sender()).foreach { f =>
         freePool = freePool - sender()
+        // pickme
+        ContainerPool.freePoolSize.prev()
       }
       // container was busy (busy indicates at full capacity), so there is capacity to accept another job request
       busyPool.get(sender()).foreach { _ =>
         busyPool = busyPool - sender()
+        // pickme
+        ContainerPool.busyPoolSize.prev()
       }
       processBufferOrFeed()
 
@@ -330,6 +354,10 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
       // PICKMEBackgroundMonitor.updateFreeFunc(freePool.size)
 			PICKMEBackgroundMonitor.setBusyPoolSize(busyPool.size)
 			PICKMEBackgroundMonitor.setFreePoolSize(freePool.size)
+
+      // pickme
+      logging.debug(this, s"[pickme] default busypool size: ${busyPool.size}. handmade busypool size: ${ContainerPool.busyPoolSize.cur}")
+      logging.debug(this, s"[pickme] default freepool size: ${freePool.size}. handmade freepool size: ${ContainerPool.freePoolSize.cur}")
 			// functionSocketServer ! ByteString("*2@" + busyPool.count(z=>true).toString)
 			// PICKMEBackgroundMonitor.shrinkList.foreach { x =>
 				// PICKMEBackgroundMonitor.shrinkFunction(x)
@@ -343,6 +371,10 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
     // 3. The container aged and is destroying itself
     // Update the free/busy lists but no message is sent to the feed since there is no change in capacity yet
     case RescheduleJob =>
+      // pickme
+      ContainerPool.freePoolSize.prev()
+      ContainerPool.busyPoolSize.prev()
+
       freePool = freePool - sender()
       busyPool = busyPool - sender()
     case EmitMetrics =>
@@ -410,6 +442,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
     val ref = childFactory(context)
     val data = MemoryData(memoryLimit)
     freePool = freePool + (ref -> data)
+    // pickme
+    ContainerPool.freePoolSize.next()
     ref -> data
   }
 
@@ -456,6 +490,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         case (ref, data) =>
           // Move the container to the usual pool
           freePool = freePool + (ref -> data)
+          // pickme
+          ContainerPool.freePoolSize.next()
           prewarmedPool = prewarmedPool - ref
           // Create a new prewarm container
           // NOTE: prewarming ignores the action code in exec, but this is dangerous as the field is accessible to the
@@ -472,6 +508,9 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
   /** Removes a container and updates state accordingly. */
   def removeContainer(toDelete: ActorRef) = {
     toDelete ! Remove
+    // pickme
+    ContainerPool.freePoolSize.prev()
+    ContainerPool.busyPoolSize.prev()
     freePool = freePool - toDelete
     busyPool = busyPool - toDelete
   }
@@ -514,6 +553,9 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 }
 
 object ContainerPool {
+
+  val freePoolSize = new Counter
+  val busyPoolSize = new Counter
 
   /**
    * Calculate the memory of a given pool.

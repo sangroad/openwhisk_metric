@@ -140,11 +140,15 @@ class InvokerReactive(
 
   private val collectLogs = new LogStoreCollector(logsProvider)
 
-  // pickme
-  private val periodicMonitor = actorSystem.actorOf(Props {
-    new PeriodicMonitor()
+  /* [pickme] */
+  private val periodicSender = actorSystem.actorOf(Props {
+    new PeriodicSender()
   })
-  actorSystem.scheduler.schedule(0.second, 30.millisecond, periodicMonitor, Tick())
+  actorSystem.scheduler.schedule(0.second, 30.millisecond, periodicSender, Tick())
+  // private val periodicMonitor = actorSystem.actorOf(Props {
+  //   new PeriodicMonitor()
+  // })
+  // actorSystem.scheduler.schedule(0.second, 30.millisecond, periodicMonitor, Tick())
 
   /** Stores an activation in the database. */
   private val store = (tid: TransactionId, activation: WhiskActivation, isBlocking: Boolean, context: UserContext) => {

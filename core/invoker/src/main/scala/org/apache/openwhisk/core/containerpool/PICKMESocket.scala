@@ -24,6 +24,11 @@ class PICKMESocketServer extends Actor {
       connection ! Register(self)
 
       context.become {
+        case data: PICKMEPeriodicData =>
+          val strData = s"*${data.busyPoolSize}@${data.freePoolSize}@${data.initContainers}@${data.creatingContainers}"
+          val sendData = ByteString(strData)
+
+          connection ! Write(sendData)
         case data: PICKMESocketData =>
           val metric = data.metric
           val bgMetric = metric.getBackgroundMetric()
