@@ -23,8 +23,8 @@ class PeriodicSender extends Actor {
 		case t: Tick =>
 			val creating = ContainerProxy.creating.cur
 			val initializing = ContainerProxy.initializing.cur
-			val busypool = ContainerPool.busyPoolSize.cur
-			val freepool = ContainerPool.freePoolSize.cur
+			val busypool = ContainerPool.busyPool.size
+			val freepool = ContainerPool.freePool.size
 
 			socket ! PICKMEPeriodicData(busypool, freepool, initializing, creating)
 	}

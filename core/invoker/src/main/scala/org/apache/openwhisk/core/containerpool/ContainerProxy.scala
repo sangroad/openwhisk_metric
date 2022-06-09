@@ -854,7 +854,7 @@ class ContainerProxy(factory: (TransactionId,
         // logging.info(this, s"[pickme] initalize ~ run: ${(System.nanoTime - sTime) / 1000000}ms, concurrent running: ${ContainerProxy.initializing.prev()}")
         PICKMEBackgroundMonitor.setInitContainer(ContainerProxy.initializing.prev())
         PICKMEActivationMonitor.setActivationInputSize(FuncInputSize(job.msg.activationId, parameters.toString().size))
-        logging.info(this, s"[pickme] param size: ${parameters.toString().size}")
+        // logging.info(this, s"[pickme] param size: ${parameters.toString().size}")
         container
           .run(
             parameters,
