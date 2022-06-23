@@ -5,12 +5,13 @@ import akka.actor.{ Actor, Props }
 import akka.io.{ IO, Tcp }
 import akka.util.ByteString
 import java.net.InetSocketAddress
+import scala.concurrent.Future
 
-class PICKMESocketServer extends Actor {
+class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extends Actor {
   import Tcp._
   import context.system
 
-  IO(Tcp) ! Bind(self, new InetSocketAddress("0.0.0.0", 7778))
+  IO(Tcp) ! Bind(self, new InetSocketAddress("0.0.0.0", port))
 
   def receive = {
     case b @ Bound(localAddress) =>
@@ -39,9 +40,13 @@ class PICKMESocketServer extends Actor {
 
           val sendData = ByteString(strData)
           connection ! Write(sendData)
-          // println(s"[pickme] socket data: ${strData}")
         case Received(data) =>
-          val splitted = data.utf8String.split("@")
+          val PICKMEflag = "PICKME"
+          val received = data.utf8String
+          val addFlag = received + PICKMEflag
+          println(s"[pickme] received data: ${addFlag}")
+          handler(addFlag.getBytes())
+          /*
           val avgCpu = splitted(0)
           val maxCpu = splitted(1)
           val minCpu = splitted(2)
@@ -61,10 +66,11 @@ class PICKMESocketServer extends Actor {
             * Is there warm instance of function name? yes (1), no (0) + busy function number + memory consumption of function free+busy instance
             * + function hit count list + function memory limit + arrival rate of invoker
           */
-          // val sendData = PICKMEBackgroundMonitor.checkWarmInstance(splitted(0)).toString + "@" + PICKMEBackgroundMonitor.getBusyFunc.toString + "@" + 
-          // PICKMEBackgroundMonitor.getMemoryConsumption.toString + "@" + PICKMEBackgroundMonitor.getHitCountList.toString + "@" + splitted(1)
+          val sendData = PICKMEBackgroundMonitor.checkWarmInstance(splitted(0)).toString + "@" + PICKMEBackgroundMonitor.getBusyFunc.toString + "@" + 
+          PICKMEBackgroundMonitor.getMemoryConsumption.toString + "@" + PICKMEBackgroundMonitor.getHitCountList.toString + "@" + splitted(1)
 
-          // connection ! Write(ByteString(sendData))
+          connection ! Write(ByteString(sendData))
+          */
 
         case _: ConnectionClosed =>
           connection ! Close

@@ -268,14 +268,16 @@ class ShardingContainerPoolBalancer(
       else (schedulingState.blackboxInvokers, schedulingState.blackboxStepSizes)
     val chosen = if (invokersToUse.nonEmpty) {
       val hash = ShardingContainerPoolBalancer.generateHash(msg.user.namespace.name, action.fullyQualifiedName(false))
+      val homeInvoker = hash % invokersToUse.size
 
-      // pickme
+      /* [pickme] get homeInvoker from RDMA process */
+      /*
       getInvokerActor ! "do"
       val sendMsg = "*" + msg.activationId.toString + "@" + action.limits.memory.megabytes.toString + "@" + action.fullyQualifiedName(true).name.toString
       logging.info(this, s"[pickme] mmIO msg: ${sendMsg}")
       pushFunctionActor ! sendMsg
       val homeInvoker = ScheduleBuffer.getInvoker(msg.activationId.toString)
-      // val homeInvoker = hash % invokersToUse.size
+      */
 
       val stepSize = stepSizes(hash % stepSizes.size)
       val invoker: Option[(InvokerInstanceId, Boolean)] = ShardingContainerPoolBalancer.schedule(

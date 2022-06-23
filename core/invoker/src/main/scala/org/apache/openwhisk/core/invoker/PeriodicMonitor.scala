@@ -5,6 +5,7 @@ import org.apache.openwhisk.core.containerpool.{ PICKMEBackgroundMonitor, PICKME
 import org.apache.openwhisk.core.containerpool.ContainerProxy
 import org.apache.openwhisk.core.containerpool.ContainerPool
 import org.apache.openwhisk.core.containerpool.PICKMEPeriodicData
+import scala.concurrent.Future
 
 case class Tick()
 
@@ -15,9 +16,12 @@ class PeriodicMonitor extends Actor {
 	}
 }
 
-class PeriodicSender extends Actor {
+class PeriodicSender(handler: Array[Byte] => Future[Unit]) extends Actor {
 	val actorSystem = ActorSystem("PICKMESystem")
-	val socket = actorSystem.actorOf(Props[PICKMESocketServer], "periodic")
+	// val socket = actorSystem.actorOf(Props[PICKMESocketServer], "periodic")
+	val socket = actorSystem.actorOf(Props {
+		new PICKMESocketServer(7778, handler)
+	})
 
 	def receive: Receive = {
 		case t: Tick =>

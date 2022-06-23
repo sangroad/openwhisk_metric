@@ -140,9 +140,9 @@ class InvokerReactive(
 
   private val collectLogs = new LogStoreCollector(logsProvider)
 
-  /* [pickme] */
+  /* [pickme] periodically send metrics to RDMA process */
   private val periodicSender = actorSystem.actorOf(Props {
-    new PeriodicSender()
+    new PeriodicSender(processActivationMessage)
   })
   actorSystem.scheduler.schedule(0.second, 30.millisecond, periodicSender, Tick())
   // private val periodicMonitor = actorSystem.actorOf(Props {
@@ -232,14 +232,21 @@ class InvokerReactive(
   /** Is called when an ActivationMessage is read from Kafka */
   def processActivationMessage(bytes: Array[Byte]): Future[Unit] = {
     // pickme
-    val msg = new String(bytes, StandardCharsets.UTF_8).split("@")
+    val rawString = new String(bytes, StandardCharsets.UTF_8)
+    val splittedMsg = rawString.split("PICKME")(0)
+    val lastSix = rawString.takeRight(6)
+
+    logging.info(this, s"rawString: ${rawString}")
+
+    /*
     val activationMsg = msg(0)
     if (msg.length > 1) {
       val queueLen = msg(1).toLong
       PICKMEBackgroundMonitor.addQueueLen(queueLen)
     }
+    */
 
-    Future(ActivationMessage.parse(activationMsg))
+    Future(ActivationMessage.parse(splittedMsg))
       .flatMap(Future.fromTry)
       .flatMap { msg =>
         // The message has been parsed correctly, thus the following code needs to *always* produce at least an
@@ -252,7 +259,14 @@ class InvokerReactive(
 
         if (!namespaceBlacklist.isBlacklisted(msg.user)) {
           val start = transid.started(this, LoggingMarkers.INVOKER_ACTIVATION, logLevel = InfoLevel)
-          handleActivationMessage(msg)
+
+          // pickme
+          if (transid.id == TransactionId.invokerHealth.id || lastSix == "PICKME") {
+            handleActivationMessage(msg)
+          }
+          else {
+            Future.successful(())
+          }
         } else {
           // Iff the current namespace is blacklisted, an active-ack is only produced to keep the loadbalancer protocol
           // Due to the protective nature of the blacklist, a database entry is not written.
@@ -260,6 +274,7 @@ class InvokerReactive(
 
           val activation =
             generateFallbackActivation(msg, ActivationResponse.applicationError(Messages.namespacesBlacklisted))
+            // generateFallbackActivation(msg, ActivationResponse.success(Some(JsObject.empty)))
           ack(
             msg.transid,
             activation,
