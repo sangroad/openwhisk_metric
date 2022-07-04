@@ -141,10 +141,8 @@ class InvokerReactive(
   private val collectLogs = new LogStoreCollector(logsProvider)
 
   /* [pickme] periodically send metrics to RDMA process */
-  private val periodicSender = actorSystem.actorOf(Props {
-    new PeriodicSender(processActivationMessage)
-  })
-  actorSystem.scheduler.schedule(0.second, 30.millisecond, periodicSender, Tick())
+  private val pickmeConnector = Some(actorSystem.actorOf(Props {new PICKMEConnector(processActivationMessage)}))
+  actorSystem.scheduler.schedule(0.second, 30.millisecond, pickmeConnector.get, Tick())
   // private val periodicMonitor = actorSystem.actorOf(Props {
   //   new PeriodicMonitor()
   // })
@@ -160,7 +158,7 @@ class InvokerReactive(
   private val childFactory = (f: ActorRefFactory) =>
     f.actorOf(
       ContainerProxy
-        .props(containerFactory.createContainer, ack, store, collectLogs, instance, poolConfig))
+        .props(containerFactory.createContainer, ack, store, collectLogs, instance, poolConfig, pickmeCon=pickmeConnector))
 
   val prewarmingConfigs: List[PrewarmingConfig] = {
     ExecManifest.runtimesManifest.stemcells.flatMap {
@@ -172,7 +170,7 @@ class InvokerReactive(
   }
 
   private val pool =
-    actorSystem.actorOf(ContainerPool.props(childFactory, poolConfig, activationFeed, prewarmingConfigs))
+    actorSystem.actorOf(ContainerPool.props(childFactory, poolConfig, activationFeed, prewarmingConfigs, pickmeConnector))
 
   def handleActivationMessage(msg: ActivationMessage)(implicit transid: TransactionId): Future[Unit] = {
     val namespace = msg.action.path
@@ -265,7 +263,8 @@ class InvokerReactive(
             handleActivationMessage(msg)
           }
           else {
-            Future.successful(())
+            handleActivationMessage(msg)  // for warm/cold test
+            // Future.successful(())
           }
         } else {
           // Iff the current namespace is blacklisted, an active-ack is only produced to keep the loadbalancer protocol

@@ -25,12 +25,17 @@ class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extend
       connection ! Register(self)
 
       context.become {
+        case data: ByteString =>
+          /* send container status */
+          connection ! Write(data)
         case data: PICKMEPeriodicData =>
+          /* send openwhisk-side metrics to RDMA process */
           val strData = s"*${data.busyPoolSize}@${data.freePoolSize}@${data.initContainers}@${data.creatingContainers}"
           val sendData = ByteString(strData)
 
-          connection ! Write(sendData)
+          // connection ! Write(sendData) // for container status test
         case data: PICKMESocketData =>
+          /* for ML metric collection */
           val metric = data.metric
           val bgMetric = metric.getBackgroundMetric()
           val strData = s"*${data.activationId}@${metric.actionName}@${metric.status}@${metric.duration}@${metric.waitTime}@${metric.initTime}" +

@@ -64,6 +64,7 @@ import org.apache.openwhisk.http.Messages
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
+import akka.util.ByteString
 
 // States
 sealed trait ContainerState
@@ -261,7 +262,8 @@ class ContainerProxy(factory: (TransactionId,
                      activationErrorLoggingConfig: ContainerProxyActivationErrorLogConfig,
                      unusedTimeout: FiniteDuration,
                      pauseGrace: FiniteDuration,
-                     testTcp: Option[ActorRef])
+                     testTcp: Option[ActorRef],
+                     pickmeCon: Option[ActorRef])
     extends FSM[ContainerState, ContainerData]
     with Stash {
   implicit val ec = context.system.dispatcher
@@ -277,6 +279,9 @@ class ContainerProxy(factory: (TransactionId,
   var activeCount = 0;
   var healthPingActor: Option[ActorRef] = None //setup after prewarm starts
   val tcp: ActorRef = testTcp.getOrElse(IO(Tcp)) //allows to testing interaction with Tcp extension
+
+  val pickmeConnector = pickmeCon.get
+  val FUNC_DURATION = "3"
 
   startWith(Uninitialized, NoData())
 
@@ -949,7 +954,10 @@ class ContainerProxy(factory: (TransactionId,
         if (splitAckMessagesPendingLogCollection) {
           sendResult.onComplete(
             _ => {
-              // pickme
+              // [pickme] send function's duration to RDMA process
+              pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.name}#${activation.duration.get}")
+
+              // [pickme] monitor waitTime and initTime for ML data
               val waitTime = activation.annotations.get("waitTime")
               val initTime = activation.annotations.get("initTime")
               PICKMEActivationMonitor.setActivationDuration(FuncDuration(activation.activationId, activation.duration.get,
@@ -1022,7 +1030,8 @@ object ContainerProxy {
             activationErrorLogConfig: ContainerProxyActivationErrorLogConfig = activationErrorLogging,
             unusedTimeout: FiniteDuration = timeouts.idleContainer,
             pauseGrace: FiniteDuration = timeouts.pauseGrace,
-            tcp: Option[ActorRef] = None) =
+            tcp: Option[ActorRef] = None,
+            pickmeCon: Option[ActorRef]) =
     Props(
       new ContainerProxy(
         factory,
@@ -1035,7 +1044,8 @@ object ContainerProxy {
         activationErrorLogConfig,
         unusedTimeout,
         pauseGrace,
-        tcp))
+        tcp,
+        pickmeCon))
 
   // Needs to be thread-safe as it's used by multiple proxies concurrently.
   private val containerCount = new Counter

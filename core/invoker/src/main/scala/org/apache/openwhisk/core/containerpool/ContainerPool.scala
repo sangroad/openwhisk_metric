@@ -18,6 +18,7 @@
 package org.apache.openwhisk.core.containerpool
 
 import akka.actor.{Actor, ActorRef, ActorRefFactory, Props}
+import akka.util.ByteString
 import org.apache.openwhisk.common.{Logging, LoggingMarkers, MetricEmitter, TransactionId}
 import org.apache.openwhisk.core.connector.MessageFeed
 import org.apache.openwhisk.core.entity.ExecManifest.ReactivePrewarmingConfig
@@ -58,14 +59,22 @@ case object AdjustPrewarmedContainer
 class ContainerPool(childFactory: ActorRefFactory => ActorRef,
                     feed: ActorRef,
                     prewarmConfig: List[PrewarmingConfig] = List.empty,
-                    poolConfig: ContainerPoolConfig)(implicit val logging: Logging)
+                    poolConfig: ContainerPoolConfig,
+                    pickmeCon: Option[ActorRef])(implicit val logging: Logging)
     extends Actor {
   import ContainerPool.memoryConsumptionOf
 
   implicit val ec = context.dispatcher
 
+  // pickme
   // var freePool = immutable.Map.empty[ActorRef, ContainerData]
   // var busyPool = immutable.Map.empty[ActorRef, ContainerData]
+  val pickmeConnector = pickmeCon.get
+  val COLD_START = "0"
+  val WARM_START = "1"
+  val CONTAINER_TERM = "2"
+  // val CONTAINER_RUNNING = "2"  // need to monitor currently running contaainers. Replaced to busypool size
+
   var prewarmedPool = immutable.Map.empty[ActorRef, PreWarmedData]
   var prewarmStartingPool = immutable.Map.empty[ActorRef, (String, ByteSize)]
   // If all memory slots are occupied and if there is currently no container to be removed, than the actions will be
@@ -170,11 +179,13 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
           case Some(((actor, data), containerState)) =>
             containerState match {
 							case "prewarmed" | "cold" | "recreated" | "recreatedPrewarm" =>
-								// PICKMEBackgroundMonitor.addFunction(r.action.name.toString, r.action.limits.memory.megabytes.toInt)
+								PICKMEBackgroundMonitor.addFunction(r.action.name.toString, r.action.limits.memory.megabytes.toInt)
 								PICKMEActivationMonitor.setActivationColdWarm(FuncInitialData(r.msg.activationId, r.action.name, "cold"))
+                pickmeConnector ! ByteString(s"*${COLD_START}#${r.action.name.toString()}")
 							case _ =>
-								// PICKMEBackgroundMonitor.warmHit(r.action.name.toString)
+								PICKMEBackgroundMonitor.warmHit(r.action.name.toString)
 								PICKMEActivationMonitor.setActivationColdWarm(FuncInitialData(r.msg.activationId, r.action.name, "warm"))
+                pickmeConnector ! ByteString(s"*${WARM_START}#${r.action.name.toString()}")
             }
           case None =>
         }
@@ -216,15 +227,15 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
             logContainerStart(r, containerState, newData.activeActivationCount, container)
 
 						// pickme
-						// functionSocketServer ! ByteString("*2@" + busyPool.count(z=>true).toString)
+            // pickmeConnector ! ByteString(s"*${CONTAINER_RUNNING}#${ContainerPool.busyPool.size.toString()}")
 						PICKMEBackgroundMonitor.setBusyPoolSize(ContainerPool.busyPool.size)
 						PICKMEBackgroundMonitor.setFreePoolSize(ContainerPool.freePool.size)
 
-						// PICKMEBackgroundMonitor.shrinkList.foreach { x =>
-							// PICKMEBackgroundMonitor.shrinkFunction(x)
-							// functionSocketServer ! ByteString("*3@" + x)
-							// PICKMEBackgroundMonitor.shrinkList -= x
-						// }
+						PICKMEBackgroundMonitor.shrinkList.foreach { x =>
+							PICKMEBackgroundMonitor.shrinkFunction(x)
+              pickmeConnector ! ByteString(s"*${CONTAINER_TERM}#${x}")
+							PICKMEBackgroundMonitor.shrinkList -= x
+						}
 
           case None =>
             // this can also happen if createContainer fails to start a new container, or
@@ -285,14 +296,15 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 
 			// pickme
 			// functionSocketServer ! ByteString("*2@" + busyPool.count(z=>true).toString)
+      // pickmeConnector ! ByteString(s"*${CONTAINER_RUNNING}#${ContainerPool.busyPool.size.toString()}")
 			PICKMEBackgroundMonitor.setBusyPoolSize(ContainerPool.busyPool.size)
 			PICKMEBackgroundMonitor.setFreePoolSize(ContainerPool.freePool.size)
 
-			// PICKMEBackgroundMonitor.shrinkList.foreach { x =>
-				// PICKMEBackgroundMonitor.shrinkFunction(x)
-			  // functionSocketServer ! ByteString("*3@" + x)
-			  // PICKMEBackgroundMonitor.shrinkList -= x
-			// }
+			PICKMEBackgroundMonitor.shrinkList.foreach { x =>
+				PICKMEBackgroundMonitor.shrinkFunction(x)
+        pickmeConnector ! ByteString(s"*${CONTAINER_TERM}#${x}")
+			  PICKMEBackgroundMonitor.shrinkList -= x
+			}
 
     // Container is prewarmed and ready to take work
     case NeedWork(data: PreWarmedData) =>
@@ -328,17 +340,17 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
       }
 
 			// pickme
-      // PICKMEBackgroundMonitor.updateBusyFunc(busyPool.count(z=>true))
-      // PICKMEBackgroundMonitor.updateFreeFunc(freePool.size)
+      PICKMEBackgroundMonitor.updateBusyFunc(ContainerPool.busyPool.size)
+      PICKMEBackgroundMonitor.updateFreeFunc(ContainerPool.freePool.size)
 			PICKMEBackgroundMonitor.setBusyPoolSize(ContainerPool.busyPool.size)
 			PICKMEBackgroundMonitor.setFreePoolSize(ContainerPool.freePool.size)
 
-			// functionSocketServer ! ByteString("*2@" + busyPool.count(z=>true).toString)
-			// PICKMEBackgroundMonitor.shrinkList.foreach { x =>
-				// PICKMEBackgroundMonitor.shrinkFunction(x)
-				// functionSocketServer ! ByteString("*3@" + x)
-				// PICKMEBackgroundMonitor.shrinkList -= x
-			// }
+      // pickmeConnector ! ByteString(s"*${CONTAINER_RUNNING}#${ContainerPool.busyPool.size.toString()}")
+			PICKMEBackgroundMonitor.shrinkList.foreach { x =>
+				PICKMEBackgroundMonitor.shrinkFunction(x)
+				pickmeConnector ! ByteString(s"*${CONTAINER_TERM}#${x}")
+				PICKMEBackgroundMonitor.shrinkList -= x
+			}
 
     // This message is received for one of these reasons:
     // 1. Container errored while resuming a warm container, could not process the job, and sent the job back
@@ -741,8 +753,9 @@ object ContainerPool {
   def props(factory: ActorRefFactory => ActorRef,
             poolConfig: ContainerPoolConfig,
             feed: ActorRef,
-            prewarmConfig: List[PrewarmingConfig] = List.empty)(implicit logging: Logging) =
-    Props(new ContainerPool(factory, feed, prewarmConfig, poolConfig))
+            prewarmConfig: List[PrewarmingConfig] = List.empty,
+            pickmeCon: Option[ActorRef])(implicit logging: Logging) =
+    Props(new ContainerPool(factory, feed, prewarmConfig, poolConfig, pickmeCon))
 }
 
 /** Contains settings needed to perform container prewarming. */

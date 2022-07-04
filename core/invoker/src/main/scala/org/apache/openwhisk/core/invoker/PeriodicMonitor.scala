@@ -6,6 +6,7 @@ import org.apache.openwhisk.core.containerpool.ContainerProxy
 import org.apache.openwhisk.core.containerpool.ContainerPool
 import org.apache.openwhisk.core.containerpool.PICKMEPeriodicData
 import scala.concurrent.Future
+import akka.util.ByteString
 
 case class Tick()
 
@@ -16,7 +17,7 @@ class PeriodicMonitor extends Actor {
 	}
 }
 
-class PeriodicSender(handler: Array[Byte] => Future[Unit]) extends Actor {
+class PICKMEConnector(handler: Array[Byte] => Future[Unit]) extends Actor {
 	val actorSystem = ActorSystem("PICKMESystem")
 	// val socket = actorSystem.actorOf(Props[PICKMESocketServer], "periodic")
 	val socket = actorSystem.actorOf(Props {
@@ -24,6 +25,8 @@ class PeriodicSender(handler: Array[Byte] => Future[Unit]) extends Actor {
 	})
 
 	def receive: Receive = {
+		case data: ByteString =>
+			socket ! data
 		case t: Tick =>
 			val creating = ContainerProxy.creating.cur
 			val initializing = ContainerProxy.initializing.cur
