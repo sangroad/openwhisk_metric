@@ -263,8 +263,8 @@ class InvokerReactive(
             handleActivationMessage(msg)
           }
           else {
-            handleActivationMessage(msg)  // for warm/cold test
-            // Future.successful(())
+            // handleActivationMessage(msg)  // for warm/cold test
+            Future.successful(())
           }
         } else {
           // Iff the current namespace is blacklisted, an active-ack is only produced to keep the loadbalancer protocol

@@ -33,7 +33,7 @@ class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extend
           val strData = s"*${data.busyPoolSize}@${data.freePoolSize}@${data.initContainers}@${data.creatingContainers}"
           val sendData = ByteString(strData)
 
-          // connection ! Write(sendData) // for container status test
+          connection ! Write(sendData)
         case data: PICKMESocketData =>
           /* for ML metric collection */
           val metric = data.metric

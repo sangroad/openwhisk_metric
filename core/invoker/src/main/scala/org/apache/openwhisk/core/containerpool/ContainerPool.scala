@@ -181,11 +181,11 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 							case "prewarmed" | "cold" | "recreated" | "recreatedPrewarm" =>
 								PICKMEBackgroundMonitor.addFunction(r.action.name.toString, r.action.limits.memory.megabytes.toInt)
 								PICKMEActivationMonitor.setActivationColdWarm(FuncInitialData(r.msg.activationId, r.action.name, "cold"))
-                pickmeConnector ! ByteString(s"*${COLD_START}#${r.action.name.toString()}")
+                pickmeConnector ! ByteString(s"*${COLD_START}#${r.msg.activationId}#${r.action.name.toString()}")
 							case _ =>
 								PICKMEBackgroundMonitor.warmHit(r.action.name.toString)
 								PICKMEActivationMonitor.setActivationColdWarm(FuncInitialData(r.msg.activationId, r.action.name, "warm"))
-                pickmeConnector ! ByteString(s"*${WARM_START}#${r.action.name.toString()}")
+                pickmeConnector ! ByteString(s"*${WARM_START}#${r.msg.activationId}#${r.action.name.toString()}")
             }
           case None =>
         }

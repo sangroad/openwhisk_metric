@@ -831,8 +831,11 @@ class ContainerProxy(factory: (TransactionId,
           "deadline" -> (Instant.now.toEpochMilli + actionTimeout.toMillis).toString.toJson)) map {
           case (key, value) => "__OW_" + key.toUpperCase -> value
         }
+        /*
+          [pickme] for monitor input data
         val initData = job.action.containerInitializer((env ++ owEnv))
-        logging.info(this, s"[pickme] initData's size: ${initData.toString().size}")
+        logging.debug(this, s"[pickme] initData's size: ${initData.toString().size}")
+        */
 
         container
           .initialize(
@@ -955,7 +958,8 @@ class ContainerProxy(factory: (TransactionId,
           sendResult.onComplete(
             _ => {
               // [pickme] send function's duration to RDMA process
-              pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.name}#${activation.duration.get}")
+              // pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.name}#${activation.duration.get}")
+              pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.activationId}#${activation.name}#${activation.duration.get}")
 
               // [pickme] monitor waitTime and initTime for ML data
               val waitTime = activation.annotations.get("waitTime")
