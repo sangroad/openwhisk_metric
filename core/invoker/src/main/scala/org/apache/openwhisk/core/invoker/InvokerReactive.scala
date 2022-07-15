@@ -234,8 +234,6 @@ class InvokerReactive(
     val splittedMsg = rawString.split("PICKME")(0)
     val lastSix = rawString.takeRight(6)
 
-    logging.info(this, s"rawString: ${rawString}")
-
     /*
     val activationMsg = msg(0)
     if (msg.length > 1) {
@@ -258,7 +256,7 @@ class InvokerReactive(
         if (!namespaceBlacklist.isBlacklisted(msg.user)) {
           val start = transid.started(this, LoggingMarkers.INVOKER_ACTIVATION, logLevel = InfoLevel)
 
-          // pickme
+          // [pickme] function from pickme or health ping
           if (transid.id == TransactionId.invokerHealth.id || lastSix == "PICKME") {
             handleActivationMessage(msg)
           }

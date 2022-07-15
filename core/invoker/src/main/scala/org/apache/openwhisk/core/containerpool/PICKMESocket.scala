@@ -12,6 +12,10 @@ class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extend
   import context.system
 
   IO(Tcp) ! Bind(self, new InetSocketAddress("0.0.0.0", port))
+  var prevMsg: String = ""
+
+  val bufSize: Int = 10
+  var bufIndex: Int = 0
 
   def receive = {
     case b @ Bound(localAddress) =>
@@ -48,9 +52,16 @@ class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extend
         case Received(data) =>
           val PICKMEflag = "PICKME"
           val received = data.utf8String
-          val addFlag = received + PICKMEflag
-          println(s"[pickme] received data: ${addFlag}")
-          handler(addFlag.getBytes())
+          val ret = received.split('*').foreach { msg =>
+            if (msg.length() != 0) {
+              if (prevMsg != msg) {
+                prevMsg = msg
+                val addFlag = msg + PICKMEflag
+                println(s"[pickme] received data: ${addFlag}")
+                handler(addFlag.getBytes())
+              }
+            }
+          }
           /*
           val avgCpu = splitted(0)
           val maxCpu = splitted(1)

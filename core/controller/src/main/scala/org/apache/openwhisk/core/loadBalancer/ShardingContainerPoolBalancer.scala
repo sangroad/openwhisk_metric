@@ -268,7 +268,7 @@ class ShardingContainerPoolBalancer(
       else (schedulingState.blackboxInvokers, schedulingState.blackboxStepSizes)
     val chosen = if (invokersToUse.nonEmpty) {
       val hash = ShardingContainerPoolBalancer.generateHash(msg.user.namespace.name, action.fullyQualifiedName(false))
-      // val homeInvoker = hash % invokersToUse.size
+      val homeInvoker = hash % invokersToUse.size
 
       /* [pickme] get homeInvoker from RDMA process */
       // getInvokerActor ! "do" // Not read invoker number from RDMA process. Send action to invoker directly
@@ -278,7 +278,6 @@ class ShardingContainerPoolBalancer(
       logging.debug(this, s"[pickme] sendMsg: ${sendMsg}")
       pushFunctionActor ! sendMsg
       // val homeInvoker = ScheduleBuffer.getInvoker(msg.activationId.toString)
-      val homeInvoker = hash % invokersToUse.size
 
       val stepSize = stepSizes(hash % stepSizes.size)
       val invoker: Option[(InvokerInstanceId, Boolean)] = ShardingContainerPoolBalancer.schedule(
@@ -425,7 +424,8 @@ object ShardingContainerPoolBalancer extends LoadBalancerProvider {
     if (numInvokers > 0) {
       val invoker = invokers(index)
       //test this invoker - if this action supports concurrency, use the scheduleConcurrent function
-      if (invoker.status.isUsable && dispatched(invoker.id.toInt).tryAcquireConcurrent(fqn, maxConcurrent, slots)) {
+      if (invoker.status.isUsable) {
+      // if (invoker.status.isUsable && dispatched(invoker.id.toInt).tryAcquireConcurrent(fqn, maxConcurrent, slots)) {
         Some(invoker.id, false)
       } else {
         // If we've gone through all invokers

@@ -962,10 +962,12 @@ class ContainerProxy(factory: (TransactionId,
               pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.activationId}#${activation.name}#${activation.duration.get}")
 
               // [pickme] monitor waitTime and initTime for ML data
+              /*
               val waitTime = activation.annotations.get("waitTime")
               val initTime = activation.annotations.get("initTime")
-              PICKMEActivationMonitor.setActivationDuration(FuncDuration(activation.activationId, activation.duration.get,
-              waitTime, initTime))
+              PICKMEActivationMonitor.setActivationDuration(FuncDuration(activation.activationId, activation.duration.get, waitTime, initTime))
+              logging.info(this, s"[pickme] send activeack. tid: ${tid.id}")
+              */
               sendActiveAck(
                 tid,
                 activation,
