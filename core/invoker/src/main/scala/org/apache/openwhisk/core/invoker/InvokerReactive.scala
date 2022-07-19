@@ -143,6 +143,7 @@ class InvokerReactive(
   /* [pickme] periodically send metrics to RDMA process */
   private val pickmeConnector = Some(actorSystem.actorOf(Props {new PICKMEConnector(processActivationMessage)}))
   actorSystem.scheduler.schedule(0.second, 30.millisecond, pickmeConnector.get, Tick())
+  private var prevActivationId: String = ""
   // private val periodicMonitor = actorSystem.actorOf(Props {
   //   new PeriodicMonitor()
   // })
@@ -262,6 +263,17 @@ class InvokerReactive(
           }
           else {
             // handleActivationMessage(msg)  // for warm/cold test
+            activationFeed ! MessageFeed.Processed
+            val activation =
+              generateFallbackActivation(msg, ActivationResponse.success(Some(JsObject.empty)))
+            ack(
+              msg.transid,
+              activation,
+              false,
+              msg.rootControllerIndex,
+              msg.user.namespace.uuid,
+              CombinedCompletionAndResultMessage(transid, activation, instance))
+
             Future.successful(())
           }
         } else {

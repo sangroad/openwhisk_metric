@@ -6,6 +6,7 @@ import akka.io.{ IO, Tcp }
 import akka.util.ByteString
 import java.net.InetSocketAddress
 import scala.concurrent.Future
+import scala.collection.mutable
 
 class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extends Actor {
   import Tcp._
@@ -13,9 +14,11 @@ class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extend
 
   IO(Tcp) ! Bind(self, new InetSocketAddress("0.0.0.0", port))
   var prevMsg: String = ""
+  val determineLength: Int = 120
+  val prevActivationSet = mutable.Set.empty[String]
+  val prevActivationQueue = mutable.Queue.empty[String]
 
   val bufSize: Int = 10
-  var bufIndex: Int = 0
 
   def receive = {
     case b @ Bound(localAddress) =>
@@ -54,11 +57,21 @@ class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extend
           val received = data.utf8String
           val ret = received.split('*').foreach { msg =>
             if (msg.length() != 0) {
-              if (prevMsg != msg) {
-                prevMsg = msg
+              val msgPart = msg.substring(0, determineLength)
+              if (!prevActivationSet(msgPart)) {
                 val addFlag = msg + PICKMEflag
                 println(s"[pickme] received data: ${addFlag}")
+                prevActivationSet += msgPart
+                prevActivationQueue += msgPart
+
+                if (prevActivationQueue.size > bufSize) {
+                  val key = prevActivationQueue.dequeue()
+                  prevActivationSet -= key
+                }
                 handler(addFlag.getBytes())
+              }
+              if (prevMsg != msgPart) {
+                prevMsg = msgPart
               }
             }
           }
