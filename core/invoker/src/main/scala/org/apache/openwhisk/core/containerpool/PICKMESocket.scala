@@ -7,13 +7,15 @@ import akka.util.ByteString
 import java.net.InetSocketAddress
 import scala.concurrent.Future
 import scala.collection.mutable
+import java.time.Instant
 
 class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extends Actor {
   import Tcp._
   import context.system
 
   IO(Tcp) ! Bind(self, new InetSocketAddress("0.0.0.0", port))
-  var prevMsg: String = ""
+  var prevSocketReq: String = ""
+  var prevPeriodic: String = ""
   val determineLength: Int = 120
   val prevActivationSet = mutable.Set.empty[String]
   val prevActivationQueue = mutable.Queue.empty[String]
@@ -38,9 +40,11 @@ class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extend
         case data: PICKMEPeriodicData =>
           /* send openwhisk-side metrics to RDMA process */
           val strData = s"*${data.busyPoolSize}@${data.freePoolSize}@${data.initContainers}@${data.creatingContainers}"
-          val sendData = ByteString(strData)
-
-          connection ! Write(sendData)
+          if (strData != prevPeriodic) {
+            prevPeriodic = strData
+            val sendData = ByteString(strData)
+            connection ! Write(sendData)
+          }
         case data: PICKMESocketData =>
           /* for ML metric collection */
           val metric = data.metric
@@ -57,6 +61,7 @@ class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extend
           val received = data.utf8String
           val ret = received.split('*').foreach { msg =>
             if (msg.length() != 0) {
+              val justReceived = Instant.now().toEpochMilli()
               val msgPart = msg.substring(0, determineLength)
               if (!prevActivationSet(msgPart)) {
                 val addFlag = msg + PICKMEflag
@@ -70,8 +75,8 @@ class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extend
                 }
                 handler(addFlag.getBytes())
               }
-              if (prevMsg != msgPart) {
-                prevMsg = msgPart
+              if (prevSocketReq != msgPart) {
+                prevSocketReq = msgPart
               }
             }
           }

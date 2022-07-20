@@ -308,7 +308,6 @@ class ContainerProxy(factory: (TransactionId,
       activeCount += 1
 
       // pickme
-      val sTime = System.nanoTime()
       ContainerProxy.creating.next()
 
       // create a new container
@@ -797,8 +796,6 @@ class ContainerProxy(factory: (TransactionId,
   def initializeAndRun(container: Container, job: Run, reschedule: Boolean = false)(
     implicit tid: TransactionId): Future[WhiskActivation] = {
     
-    // pickme
-    val sTime = System.nanoTime()
     ContainerProxy.initializing.next()
 
     val actionTimeout = job.action.limits.timeout.duration
@@ -861,8 +858,7 @@ class ContainerProxy(factory: (TransactionId,
         // pickme
         // logging.info(this, s"[pickme] initalize ~ run: ${(System.nanoTime - sTime) / 1000000}ms, concurrent running: ${ContainerProxy.initializing.prev()}")
         PICKMEBackgroundMonitor.setInitContainer(ContainerProxy.initializing.prev())
-        PICKMEActivationMonitor.setActivationInputSize(FuncInputSize(job.msg.activationId, parameters.toString().size))
-        // logging.info(this, s"[pickme] param size: ${parameters.toString().size}")
+        // PICKMEActivationMonitor.setActivationInputSize(FuncInputSize(job.msg.activationId, parameters.toString().size))
         container
           .run(
             parameters,
@@ -957,9 +953,6 @@ class ContainerProxy(factory: (TransactionId,
         if (splitAckMessagesPendingLogCollection) {
           sendResult.onComplete(
             _ => {
-              // [pickme] send function's duration to RDMA process
-              // pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.name}#${activation.duration.get}")
-              pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.activationId}#${activation.name}#${activation.duration.get}")
 
               // [pickme] monitor waitTime and initTime for ML data
               /*
@@ -975,6 +968,10 @@ class ContainerProxy(factory: (TransactionId,
                 job.msg.rootControllerIndex,
                 job.msg.user.namespace.uuid,
                 CompletionMessage(tid, activation, instance))
+
+              // [pickme] send function's duration to RDMA process
+              // pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.name}#${activation.duration.get}")
+              pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.activationId}#${activation.name}#${activation.duration.get}")
             })
        }
         storeActivation(tid, activation, job.msg.blocking, context)

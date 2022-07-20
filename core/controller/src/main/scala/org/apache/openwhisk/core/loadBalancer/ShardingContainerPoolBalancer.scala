@@ -274,9 +274,10 @@ class ShardingContainerPoolBalancer(
       // getInvokerActor ! "do" // Not read invoker number from RDMA process. Send action to invoker directly
       val jsContent = msg.content.get.fields.get("execTime").getOrElse(0).toString().toInt
       val execTime = "%07d".format(jsContent)
-      val sendMsg = "*" + msg.activationId.toString() + "@" + action.fullyQualifiedName(true).name.toString() + "@" + execTime + "@" + msg.transid.id
-      logging.debug(this, s"[pickme] sendMsg: ${sendMsg}")
-      pushFunctionActor ! sendMsg
+      // val sendMsg = "*" + msg.activationId.toString() + "@" + action.fullyQualifiedName(true).name.toString() + "@" + execTime + "@" + msg.transid.id
+      val exportMsg = s"*${msg.activationId.toString()}@${action.fullyQualifiedName(true).name.toString()}@${execTime}@${msg.transid.id}@${msg.transid.meta.start.toEpochMilli()}"
+      logging.debug(this, s"[pickme] exportMsg: ${exportMsg}")
+      pushFunctionActor ! exportMsg
       // val homeInvoker = ScheduleBuffer.getInvoker(msg.activationId.toString)
 
       val stepSize = stepSizes(hash % stepSizes.size)
