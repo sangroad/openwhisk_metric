@@ -5,3 +5,5 @@ for INVOKER in "${INVOKERS[@]}"
 	do
 		ssh $INVOKER "cd ~/workspace/openwhisk_pickme/ansible; ./build.sh" &
 	done
+
+./build.sh
