@@ -309,6 +309,7 @@ class ContainerProxy(factory: (TransactionId,
 
       // pickme
       ContainerProxy.creating.next()
+      val createStart = Instant.now
 
       // create a new container
       val container = factory(
@@ -357,8 +358,9 @@ class ContainerProxy(factory: (TransactionId,
         .flatMap { container =>
           // pickme
           PICKMEBackgroundMonitor.setCreatingContainer(ContainerProxy.creating.prev())
+          val createEnd = Instant.now
           // now attempt to inject the user code and run the action
-          initializeAndRun(container, job)
+          initializeAndRun(container, job, false, Option(Interval(createStart, createEnd))) // [pickme] add interval
             .map(_ => RunCompleted)
         }
         .pipeTo(self)
@@ -793,7 +795,7 @@ class ContainerProxy(factory: (TransactionId,
    * @return a future completing after logs have been collected and
    *         added to the WhiskActivation
    */
-  def initializeAndRun(container: Container, job: Run, reschedule: Boolean = false)(
+  def initializeAndRun(container: Container, job: Run, reschedule: Boolean = false, coldStartTime: Option[Interval] = None)(
     implicit tid: TransactionId): Future[WhiskActivation] = {
     
     ContainerProxy.initializing.next()
@@ -871,12 +873,14 @@ class ContainerProxy(factory: (TransactionId,
               val initRunInterval = initInterval
                 .map(i => Interval(runInterval.start.minusMillis(i.duration.toMillis), runInterval.end))
                 .getOrElse(runInterval)
+              // [pickme] build activation. This activation is written to DB
               ContainerProxy.constructWhiskActivation(
                 job,
                 initInterval,
                 initRunInterval,
                 runInterval.duration >= actionTimeout,
-                response)
+                response,
+                coldStartTime)
           }
       }
       .recoverWith {
@@ -974,6 +978,7 @@ class ContainerProxy(factory: (TransactionId,
               pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.activationId}#${activation.name}#${activation.duration.get}")
             })
        }
+        // [pickme] store to DB
         storeActivation(tid, activation, job.msg.blocking, context)
       }
 
@@ -1087,7 +1092,8 @@ object ContainerProxy {
                                initInterval: Option[Interval],
                                totalInterval: Interval,
                                isTimeout: Boolean,
-                               response: ActivationResponse) = {
+                               response: ActivationResponse,
+                               coldStartInterval: Option[Interval] = None) = {
     val causedBy = if (job.msg.causedBySequence) {
       Some(Parameters(WhiskActivation.causedByAnnotation, JsString(Exec.SEQUENCE)))
     } else None
@@ -1099,6 +1105,10 @@ object ContainerProxy {
 
     val initTime = {
       initInterval.map(initTime => Parameters(WhiskActivation.initTimeAnnotation, initTime.duration.toMillis.toJson))
+    }
+
+    val coldTime = {
+      coldStartInterval.map(coldTime => Parameters("coldstartTime", coldTime.duration.toMillis.toJson))
     }
 
     val binding =
@@ -1120,7 +1130,7 @@ object ContainerProxy {
           Parameters(WhiskActivation.pathAnnotation, JsString(job.action.fullyQualifiedName(false).asString)) ++
           Parameters(WhiskActivation.kindAnnotation, JsString(job.action.exec.kind)) ++
           Parameters(WhiskActivation.timeoutAnnotation, JsBoolean(isTimeout)) ++
-          causedBy ++ initTime ++ waitTime ++ binding
+          causedBy ++ initTime ++ waitTime ++ binding ++ coldTime
       })
   }
 
