@@ -43,6 +43,8 @@ import org.apache.openwhisk.spi.SpiLoader
 import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
+import java.time.Instant
+import org.apache.openwhisk.core.containerpool.Interval
 
 /**
  * A loadbalancer that schedules workload based on a hashing-algorithm.
@@ -257,6 +259,9 @@ class ShardingContainerPoolBalancer(
   override def publish(action: ExecutableWhiskActionMetaData, msg: ActivationMessage)(
     implicit transid: TransactionId): Future[Future[Either[ActivationId, WhiskActivation]]] = {
 
+    // [pickme]
+    val schedStart = Instant.now
+
     val isBlackboxInvocation = action.exec.pull
     val actionType = if (!isBlackboxInvocation) "managed" else "blackbox"
     val (invokersToUse, stepSizes) =
@@ -288,6 +293,7 @@ class ShardingContainerPoolBalancer(
     } else {
       None
     }
+    val schedEnd = Instant.now
 
     chosen
       .map { invoker =>
@@ -300,6 +306,10 @@ class ShardingContainerPoolBalancer(
           this,
           s"scheduled activation ${msg.activationId}, action '${msg.action.asString}' ($actionType), ns '${msg.user.namespace.name.asString}', mem limit ${memoryLimit.megabytes} MB (${memoryLimitInfo}), time limit ${timeLimit.duration.toMillis} ms (${timeLimitInfo}) to ${invoker}")
         val activationResult = setupActivation(msg, action, invoker)
+
+        // [pickme]
+        val sendStart = Instant.now
+        logging.info(this, s"[pickme] ${msg.activationId} scheduling: ${Interval(schedStart, schedEnd).duration.toMillis}, send start: ${sendStart.toEpochMilli()}")
         sendActivationToInvoker(messageProducer, msg, invoker).map(_ => activationResult)
       }
       .getOrElse {

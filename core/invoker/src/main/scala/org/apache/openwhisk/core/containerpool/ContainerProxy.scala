@@ -301,6 +301,9 @@ class ContainerProxy(factory: (TransactionId,
     case Event(job: Run, _) =>
       implicit val transid = job.msg.transid
       activeCount += 1
+      // [pickme]
+      val createStart = Instant.now
+
       // create a new container
       val container = factory(
         job.msg.transid,
@@ -346,6 +349,8 @@ class ContainerProxy(factory: (TransactionId,
             storeActivation(transid, activation, job.msg.blocking, context)
         }
         .flatMap { container =>
+          val createEnd = Instant.now
+          logging.info(this, s"[pickme] ${job.msg.activationId} create: ${Interval(createStart, createEnd).duration.toMillis}")
           // now attempt to inject the user code and run the action
           initializeAndRun(container, job)
             .map(_ => RunCompleted)
@@ -1049,6 +1054,11 @@ object ContainerProxy {
 
     val initTime = {
       initInterval.map(initTime => Parameters(WhiskActivation.initTimeAnnotation, initTime.duration.toMillis.toJson))
+    }
+
+    // [pickme]
+    if (initTime.isDefined) {
+      println(s"[pickme] ${job.msg.activationId} init: ${initTime.get}")
     }
 
     val binding =
