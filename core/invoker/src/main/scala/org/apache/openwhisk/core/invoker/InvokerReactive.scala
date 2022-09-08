@@ -222,7 +222,8 @@ class InvokerReactive(
   /** Is called when an ActivationMessage is read from Kafka */
   def processActivationMessage(bytes: Array[Byte]): Future[Unit] = {
     // [pickme]
-    val endSend = System.nanoTime()
+    val sendEnd = Instant.now
+    // val endSend = System.nanoTime()
     Future(ActivationMessage.parse(new String(bytes, StandardCharsets.UTF_8)))
       .flatMap(Future.fromTry)
       .flatMap { msg =>
@@ -233,7 +234,8 @@ class InvokerReactive(
 
         //set trace context to continue tracing
         WhiskTracerProvider.tracer.setTraceContext(transid, msg.traceContext)
-        logging.info(this, s"[pickme] ${msg.activationId} send end: ${endSend}")
+        // logging.info(this, s"[pickme] ${msg.activationId} send end: ${endSend}")
+        logging.info(this, s"[pickme] ${msg.activationId} send: ${Interval(msg.transid.meta.sendStart, sendEnd).duration.toMillis}")
 
         if (!namespaceBlacklist.isBlacklisted(msg.user)) {
           val start = transid.started(this, LoggingMarkers.INVOKER_ACTIVATION, logLevel = InfoLevel)
