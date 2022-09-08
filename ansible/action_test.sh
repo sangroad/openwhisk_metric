@@ -1,5 +1,5 @@
 #!/bin/bash
-for it in {0..1};
+for it in {0..2};
 do
 	for i in {0..50};
 	do

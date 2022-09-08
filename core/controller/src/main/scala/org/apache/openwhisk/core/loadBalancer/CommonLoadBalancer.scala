@@ -39,8 +39,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
-import java.time.Instant
-
 /**
  * Abstract class which provides common logic for all LoadBalancer implementations.
  */
@@ -188,9 +186,8 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
       s"posting topic '$topic' with activation id '${msg.activationId}'",
       logLevel = InfoLevel)
 
-    // val sendStart = System.nanoTime()
-    // logging.info(this, s"[pickme] ${msg.activationId} sendStart: ${sendStart}")
-    msg.transid.meta.sendStart = Instant.now
+    val sendStart = System.currentTimeMillis()
+    logging.info(this, s"[pickme] ${msg.activationId} sendStart: ${sendStart}")
 
     producer.send(topic, msg).andThen {
       case Success(status) =>

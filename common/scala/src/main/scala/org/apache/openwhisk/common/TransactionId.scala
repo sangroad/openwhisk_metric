@@ -212,8 +212,7 @@ case class StartMarker(start: Instant, startMarker: LogMarkerToken)
 protected case class TransactionMetadata(id: String,
                                          start: Instant,
                                          extraLogging: Boolean = false,
-                                         parent: Option[TransactionMetadata] = None,
-                                         var sendStart: Instant = Instant.now) {
+                                         parent: Option[TransactionMetadata] = None) {
   override def toString = s"#tid_$id"
 }
 
