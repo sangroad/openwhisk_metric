@@ -177,6 +177,8 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
                                         invoker: InvokerInstanceId): Future[RecordMetadata] = {
     implicit val transid: TransactionId = msg.transid
 
+    val sendStart = System.nanoTime()
+    logging.info(this, s"[pickme] ${msg.activationId} sendStart: ${sendStart}")
     val topic = s"invoker${invoker.toInt}"
 
     MetricEmitter.emitCounterMetric(LoggingMarkers.LOADBALANCER_ACTIVATION_START)
