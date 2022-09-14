@@ -302,7 +302,7 @@ class ContainerProxy(factory: (TransactionId,
       implicit val transid = job.msg.transid
       activeCount += 1
       // [pickme]
-      val createStart = Instant.now
+      val createStart = System.nanoTime()
 
       // create a new container
       val container = factory(
@@ -349,8 +349,9 @@ class ContainerProxy(factory: (TransactionId,
             storeActivation(transid, activation, job.msg.blocking, context)
         }
         .flatMap { container =>
-          val createEnd = Instant.now
-          logging.info(this, s"[pickme] ${job.msg.activationId} create: ${Interval(createStart, createEnd).duration.toMillis}")
+          logging.info(this, s"[pickme] ${job.msg.activationId} start~container_create (ms): ${Interval(transid.meta.start, Instant.now).duration.toMillis}")
+          logging.info(this, s"[pickme] ${job.msg.activationId} create duration (ns): ${System.nanoTime() - createStart}")
+          logging.info(this, s"[pickme] ${job.msg.activationId} create end (ns): ${System.nanoTime()}")
           // now attempt to inject the user code and run the action
           initializeAndRun(container, job)
             .map(_ => RunCompleted)
@@ -800,6 +801,8 @@ class ContainerProxy(factory: (TransactionId,
       } else Map.empty
     }
 
+    // [pickme]
+    val initStart = System.nanoTime()
     // Only initialize iff we haven't yet warmed the container
     val initialize = stateData match {
       case data: WarmedData =>
@@ -821,6 +824,11 @@ class ContainerProxy(factory: (TransactionId,
 
     val activation: Future[WhiskActivation] = initialize
       .flatMap { initInterval =>
+
+        // [pickme]
+        logging.info(this, s"[pickme] ${job.msg.activationId} start~initialize (ms): ${Interval(job.msg.transid.meta.start, Instant.now).duration.toMillis}")
+        logging.info(this, s"[pickme] ${job.msg.activationId} initialize duration (ns): ${System.nanoTime() - initStart}")
+        logging.info(this, s"[pickme] ${job.msg.activationId} initialize end (ns): ${initStart}")
         //immediately setup warmedData for use (before first execution) so that concurrent actions can use it asap
         if (initInterval.isDefined) {
           self ! InitCompleted(WarmedData(container, job.msg.user.namespace.name, job.action, Instant.now, 1))
@@ -831,6 +839,8 @@ class ContainerProxy(factory: (TransactionId,
           // but potentially under-estimates actual deadline
           "deadline" -> (Instant.now.toEpochMilli + actionTimeout.toMillis).toString.toJson)
 
+        // [pickme]
+        logging.info(this, s"[pickme] ${job.msg.activationId} run start (ns): ${System.nanoTime()}")
         container
           .run(
             parameters,
@@ -1057,9 +1067,9 @@ object ContainerProxy {
     }
 
     // [pickme]
-    if (initTime.isDefined) {
-      println(s"[pickme] ${job.msg.activationId} init: ${initTime.get}")
-    }
+    // if (initTime.isDefined) {
+    //   println(s"[pickme] ${job.msg.activationId} init: ${initTime.get}")
+    // }
 
     val binding =
       job.msg.action.binding.map(f => Parameters(WhiskActivation.bindingAnnotation, JsString(f.asString)))

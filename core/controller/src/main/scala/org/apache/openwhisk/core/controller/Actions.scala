@@ -46,6 +46,9 @@ import org.apache.openwhisk.core.loadBalancer.LoadBalancerException
 import pureconfig._
 import org.apache.openwhisk.core.ConfigKeys
 
+import java.time.Instant
+import org.apache.openwhisk.core.containerpool.Interval
+
 /**
  * A singleton object which defines the properties that must be present in a configuration
  * in order to implement the actions API.
@@ -282,6 +285,9 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
                        waitOverride: FiniteDuration,
                        result: Boolean)(implicit transid: TransactionId): RequestContext => Future[RouteResult] = {
     val waitForResponse = if (blocking) Some(waitOverride) else None
+    // [pickme]
+    logging.info(this, s"[pickme] doInvoke start (ns): ${System.nanoTime()}")
+    logging.info(this, s"[pickme] start~doInvoke (ms): ${Interval(transid.meta.start, Instant.now).duration.toMillis}")
     onComplete(invokeAction(user, actionWithMergedParams, payload, waitForResponse, cause = None)) {
       case Success(Left(activationId)) =>
         // non-blocking invoke or blocking invoke which got queued instead

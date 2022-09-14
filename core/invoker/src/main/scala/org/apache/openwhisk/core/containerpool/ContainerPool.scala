@@ -29,6 +29,8 @@ import scala.collection.immutable
 import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
+import java.time.Instant
+
 case class ColdStartKey(kind: String, memory: ByteSize)
 
 case object EmitMetrics
@@ -197,6 +199,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
               // Try to process the next item in buffer (or get another message from feed, if buffer is now empty)
               processBufferOrFeed()
             }
+            logging.info(this, s"[pickme] ${r.msg.activationId} start~containerpool_check (ms): ${Interval(r.msg.transid.meta.start, Instant.now).duration.toMillis}")
+            logging.info(this, s"[pickme] ${r.msg.activationId} containerpool_check (ns): ${System.nanoTime()}")
             actor ! r // forwards the run request to the container
             logContainerStart(r, containerState, newData.activeActivationCount, container)
           case None =>

@@ -259,6 +259,7 @@ class ShardingContainerPoolBalancer(
 
     // [pickme]
     val schedStart = System.nanoTime()
+    logging.info(this, s"[pickme] ${msg.activationId} scheduling start(ns): ${schedStart}")
 
     val isBlackboxInvocation = action.exec.pull
     val actionType = if (!isBlackboxInvocation) "managed" else "blackbox"
@@ -306,7 +307,7 @@ class ShardingContainerPoolBalancer(
 
         // [pickme]
         val schedEnd = System.nanoTime()
-        logging.info(this, s"[pickme] ${msg.activationId} scheduling: ${schedEnd - schedStart}")
+        logging.info(this, s"[pickme] ${msg.activationId} scheduling duration(ns): ${schedEnd - schedStart}")
         sendActivationToInvoker(messageProducer, msg, invoker).map(_ => activationResult)
       }
       .getOrElse {

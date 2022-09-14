@@ -93,6 +93,7 @@ class Controller(val instance: ControllerInstanceId,
    * @see http://doc.akka.io/docs/akka-http/current/scala/http/routing-dsl/routes.html#composing-routes
    */
   override def routes(implicit transid: TransactionId): Route = {
+    logging.info(this, s"[pickme] route start (ns): ${System.nanoTime()}")
     super.routes ~ {
       (pathEndOrSingleSlash & get) {
         complete(info)

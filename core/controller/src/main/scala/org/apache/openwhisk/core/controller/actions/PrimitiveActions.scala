@@ -183,6 +183,8 @@ protected[actions] trait PrimitiveActions {
       cause = cause,
       WhiskTracerProvider.tracer.getTraceContext(transid))
 
+    // [pickme]
+    logging.info(this, s"[pickme] ${message.activationId} start~loadbalancer.publish(ms): ${Interval(transid.meta.start, Instant.now).duration.toMillis}")
     val postedFuture = loadBalancer.publish(action, message)
 
     postedFuture andThen {
