@@ -102,6 +102,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
     val maxConcurrent = r.action.limits.concurrency.maxConcurrent
     val activationId = r.msg.activationId.toString
 
+    // [pickme]
+    logging.info(this, s"[pickme] $activationId containerState: $containerState")
     r.msg.transid.mark(
       this,
       LoggingMarkers.INVOKER_CONTAINER_START(containerState, namespaceName, actionNamespace, actionName),
