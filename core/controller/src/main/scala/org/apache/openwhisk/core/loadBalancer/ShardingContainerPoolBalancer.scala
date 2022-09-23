@@ -4,9 +4,9 @@
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License.  You may obtain a copy of the License at 
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,12 +43,11 @@ import org.apache.openwhisk.spi.SpiLoader
 import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
-
-/**
+ /*
  * A loadbalancer that schedules workload based on a hashing-algorithm.
  *
  * ## Algorithm
- *
+ * 
  * At first, for every namespace + action pair a hash is calculated and then an invoker is picked based on that hash
  * (`hash % numInvokers`). The determined index is the so called "home-invoker". This is the invoker where the following
  * progression will **always** start. If this invoker is healthy (see "Invoker health checking") and if there is
@@ -59,21 +58,21 @@ import scala.concurrent.duration.FiniteDuration
  * through the invokers). The step-size is picked by the same hash calculated above (`hash & numStepSizes`). The
  * home-invoker-index is now incremented by the step-size and the checks (healthy + capacity) are done on the invoker
  * we land on now.
- *
+ * 
  * This procedure is repeated until all invokers have been checked at which point the "overload" strategy will be
  * employed, which is to choose a healthy invoker randomly. In a steadily running system, that overload means that there
  * is no capacity on any invoker left to schedule the current request to.
  *
  * If no invokers are available or if there are no healthy invokers in the system, the loadbalancer will return an error
  * stating that no invokers are available to take any work. Requests are not queued anywhere in this case.
- *
+ * 
  * An example:
  * - availableInvokers: 10 (all healthy)
  * - hash: 13
  * - homeInvoker: hash % availableInvokers = 13 % 10 = 3
  * - stepSizes: 1, 3, 7 (note how 2 and 5 is not part of this because it's not coprime to 10)
  * - stepSizeIndex: hash % numStepSizes = 13 % 3 = 1 => stepSize = 3
- *
+ * 
  * Progression to check the invokers: 3, 6, 9, 2, 5, 8, 1, 4, 7, 0 --> done
  *
  * This heuristic is based on the assumption, that the chance to get a warm container is the best on the home invoker
@@ -143,7 +142,7 @@ import scala.concurrent.duration.FiniteDuration
  *   So the actual number of containers launched at the invoker may be less than is counted at the loadbalancer, since
  *   the invoker may skip container launch in case there is concurrent capacity available for a container launched via
  *   some other loadbalancer.
- */
+ */ 
 class ShardingContainerPoolBalancer(
   config: WhiskConfig,
   controllerInstance: ControllerInstanceId,
@@ -268,6 +267,7 @@ class ShardingContainerPoolBalancer(
       else (schedulingState.blackboxInvokers, schedulingState.blackboxStepSizes)
     val chosen = if (invokersToUse.nonEmpty) {
       val hash = ShardingContainerPoolBalancer.generateHash(msg.user.namespace.name, action.fullyQualifiedName(false))
+      Thread.sleep(30)
       val homeInvoker = hash % invokersToUse.size
       val stepSize = stepSizes(hash % stepSizes.size)
       val invoker: Option[(InvokerInstanceId, Boolean)] = ShardingContainerPoolBalancer.schedule(
