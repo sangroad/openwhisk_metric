@@ -874,13 +874,15 @@ class ContainerProxy(factory: (TransactionId,
                 .map(i => Interval(runInterval.start.minusMillis(i.duration.toMillis), runInterval.end))
                 .getOrElse(runInterval)
               // [pickme] build activation. This activation is written to DB
+              val invokerInterval = Option(Interval(job.msg.transid.meta.invokerStart.getOrElse(initRunInterval.start), initRunInterval.start))
               ContainerProxy.constructWhiskActivation(
                 job,
                 initInterval,
                 initRunInterval,
                 runInterval.duration >= actionTimeout,
                 response,
-                coldStartTime)
+                coldStartTime,
+                invokerInterval)
           }
       }
       .recoverWith {
@@ -1093,7 +1095,8 @@ object ContainerProxy {
                                totalInterval: Interval,
                                isTimeout: Boolean,
                                response: ActivationResponse,
-                               coldStartInterval: Option[Interval] = None) = {
+                               coldStartInterval: Option[Interval] = None,
+                               invokerInterval: Option[Interval] = None) = {
     val causedBy = if (job.msg.causedBySequence) {
       Some(Parameters(WhiskActivation.causedByAnnotation, JsString(Exec.SEQUENCE)))
     } else None
@@ -1109,6 +1112,10 @@ object ContainerProxy {
 
     val coldTime = {
       coldStartInterval.map(coldTime => Parameters("coldstartTime", coldTime.duration.toMillis.toJson))
+    }
+
+    val invokerWaitTime = {
+      invokerInterval.map(invokerTime => Parameters("invokerWaitTime", invokerTime.duration.toMillis.toJson))
     }
 
     val binding =
@@ -1130,7 +1137,7 @@ object ContainerProxy {
           Parameters(WhiskActivation.pathAnnotation, JsString(job.action.fullyQualifiedName(false).asString)) ++
           Parameters(WhiskActivation.kindAnnotation, JsString(job.action.exec.kind)) ++
           Parameters(WhiskActivation.timeoutAnnotation, JsBoolean(isTimeout)) ++
-          causedBy ++ initTime ++ waitTime ++ binding ++ coldTime
+          causedBy ++ initTime ++ waitTime ++ binding ++ coldTime ++ invokerWaitTime
       })
   }
 
