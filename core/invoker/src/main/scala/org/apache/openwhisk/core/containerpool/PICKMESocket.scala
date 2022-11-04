@@ -5,6 +5,7 @@ import akka.actor.{ Actor, Props }
 import akka.io.{ IO, Tcp }
 import akka.util.ByteString
 import java.net.InetSocketAddress
+import org.apache.openwhisk.core.connector.ActivationMessage
 
 class PICKMESocketServer extends Actor {
   import Tcp._
@@ -24,6 +25,10 @@ class PICKMESocketServer extends Actor {
       connection ! Register(self)
 
       context.become {
+        case data: ActivationMessage =>
+          val strData = s"${data.activationId}@${data.action.name}"
+          val sendData = ByteString(strData)
+          connection ! Write(sendData)
         case data: PICKMESocketData =>
           val metric = data.metric
           val bgMetric = metric.getBackgroundMetric()
@@ -50,16 +55,6 @@ class PICKMESocketServer extends Actor {
           PICKMEBackgroundMonitor.collector.midCpu = midCpu.toLong
           PICKMEBackgroundMonitor.collector.IPC = ipc.toFloat
           PICKMEBackgroundMonitor.collector.memUtil = mem.toLong
-
-          /**
-            * Content)
-            * Is there warm instance of function name? yes (1), no (0) + busy function number + memory consumption of function free+busy instance
-            * + function hit count list + function memory limit + arrival rate of invoker
-          */
-          // val sendData = PICKMEBackgroundMonitor.checkWarmInstance(splitted(0)).toString + "@" + PICKMEBackgroundMonitor.getBusyFunc.toString + "@" + 
-          // PICKMEBackgroundMonitor.getMemoryConsumption.toString + "@" + PICKMEBackgroundMonitor.getHitCountList.toString + "@" + splitted(1)
-
-          // connection ! Write(ByteString(sendData))
 
         case _: ConnectionClosed =>
           connection ! Close

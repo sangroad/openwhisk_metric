@@ -141,10 +141,13 @@ class InvokerReactive(
   private val collectLogs = new LogStoreCollector(logsProvider)
 
   // pickme
+  private val pickmeSocket = actorSystem.actorOf(Props[PICKMESocketServer], "PICKMESocketServer")
+  /*
   private val periodicMonitor = actorSystem.actorOf(Props {
     new PeriodicMonitor()
   })
   actorSystem.scheduler.schedule(0.second, 30.millisecond, periodicMonitor, Tick())
+  */
 
   /** Stores an activation in the database. */
   private val store = (tid: TransactionId, activation: WhiskActivation, isBlocking: Boolean, context: UserContext) => {
@@ -248,6 +251,7 @@ class InvokerReactive(
 
         if (!namespaceBlacklist.isBlacklisted(msg.user)) {
           val start = transid.started(this, LoggingMarkers.INVOKER_ACTIVATION, logLevel = InfoLevel)
+          pickmeSocket ! msg
           handleActivationMessage(msg)
         } else {
           // Iff the current namespace is blacklisted, an active-ack is only produced to keep the loadbalancer protocol

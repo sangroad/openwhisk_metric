@@ -3,7 +3,7 @@ package org.apache.openwhisk.core.containerpool
 
 import org.apache.openwhisk.core.entity.{ActivationId, EntityName}
 import scala.collection.mutable.Map
-import akka.actor.{ActorSystem, Props}
+// import akka.actor.{ActorSystem, Props}
 
 class PICKMEMetric (backgroundMetric: PICKMEBackgroundMetric) {
 	var actionName: String = ""
@@ -28,8 +28,8 @@ class PICKMEActivationMonitor {
 
 object PICKMEActivationMonitor {
 	var activations = Map.empty[ActivationId, PICKMEMetric]
-	val actorSystem = ActorSystem("PICKMESystem")
-	val socket = actorSystem.actorOf(Props[PICKMESocketServer], "PICKMESocketServer")
+	// val actorSystem = ActorSystem("PICKMESystem")
+	// val socket = actorSystem.actorOf(Props[PICKMESocketServer], "PICKMESocketServer")
 
 	def setActivationColdWarm(initData: FuncInitialData) {
 		val metric = new PICKMEMetric(PICKMEBackgroundMonitor.getCurrentStatus())
@@ -71,7 +71,7 @@ object PICKMEActivationMonitor {
 			// PICKMEActivationMonitor.activations.update(duration.activationId, storedMetric)
 
 			// send socket
-			socket ! PICKMESocketData(duration.activationId, storedMetric)
+			// socket ! PICKMESocketData(duration.activationId, storedMetric)
 			activations -= duration.activationId
 		}	
 	}
