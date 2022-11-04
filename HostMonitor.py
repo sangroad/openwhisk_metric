@@ -9,7 +9,6 @@ from multiprocess import Process
 HOST = "127.0.0.1"
 PORT = 7778
 MSG_SIZE = 2048
-# client_socket = None
 
 MON_PERIOD = 0.03	# second
 NUM_CORES = 20
@@ -113,21 +112,19 @@ def prepare_logging():
 
 	with open(FILE_PATH, "w") as f:
 		wr = csv.writer(f)
-		wr.writerow(["activation id", "action name", "cold/warm", "duration", "avgCPU", "maxCPU", "minCPU", "midCPU", 
+		wr.writerow(["activation id", "action name", "cold/warm", "duration", "waitTime", "initTime", "avgCPU", "maxCPU", "minCPU", "midCPU", 
 		"mem", "IPC", "busyPoolSize", "freePoolSize", "queueLength", "initContainers", "creatingContainers", "inputSize"])
 
 if __name__ == "__main__":
 	prepare_logging()
+
 	sock = con_socket()
 
-	procs = []
 	ow_proc = Process(target=ow_get_metrics, args=(sock,))
-	procs.append(ow_proc)
 	ow_proc.start()
 
 	mon_proc = Process(target=monitor, args=(sock,))
-	procs.append(mon_proc)
 	mon_proc.start()
 
-	for i in procs:
-		i.join() 
+	ow_proc.join()
+	mon_proc.join()
