@@ -26,7 +26,7 @@ class PICKMESocketServer extends Actor {
 
       context.become {
         case data: ActivationMessage =>
-          val strData = s"${data.activationId}@${data.action.name}"
+          val strData = s"*${data.activationId},${data.action.name}"
           val sendData = ByteString(strData)
           connection ! Write(sendData)
         case data: PICKMESocketData =>

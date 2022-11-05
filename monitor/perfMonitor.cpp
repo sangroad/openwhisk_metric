@@ -26,81 +26,114 @@ using namespace std;
 
 int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
 vector<uint64_t> past_ns(num_cores);
+bool stop = false;
 
 // MB
 float membw = 0;
 // kB
 float iobw = 0;
 
-int sock_bind() {
-	int con_sock = -1;
-	struct sockaddr_in serv_addr;
+vector<double> mpki(7);
+vector<long> avgs(4);
+uint64_t cpu_util;
+uint64_t mem_util;
+double ipc;
+double mlp;
+string metric_msg;
 
-	con_sock = socket(PF_INET, SOCK_STREAM, 0);
-	if (con_sock == -1) {
-		printf("[ERROR] socket creation error\n");
-		exit(-1);
+int sock_create_connect(const char *ip) {
+	struct sockaddr_in serv_addr;
+	int sock = socket(PF_INET, SOCK_STREAM, 0);
+	
+	if (sock == -1) {
+		printf("socket creation error!\n");
+		return -1;
 	}
 
 	memset(&serv_addr, 0, sizeof(struct sockaddr_in));
 	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	serv_addr.sin_addr.s_addr = inet_addr(ip);
 	serv_addr.sin_port = htons(OW_PORT);
 
-	if (bind(con_sock, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) == -1) {
-		printf("[ERROR] bind error");
+	if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr_in)) == -1) {
+		printf("connect error!\n");
+		return -1;
 	}
 
-	return con_sock;
+	return sock;
 }
 
-int sock_bind_and_accept() {
-	int con_sock = sock_bind();
-	int acc_sock = -1;
-	struct sockaddr_in client_addr;
-	socklen_t client_addr_len = sizeof(struct sockaddr_in);
-
-	if (listen(con_sock, 10) == -1) {
-		printf("[ERROR] listen error");
-	}
-
-	if ((acc_sock = accept(con_sock, (struct sockaddr*) &client_addr, &client_addr_len)) == -1) {
-		printf("[ERROR] accept error");
-	}
-
-	return acc_sock;
-}
-
-string build_msg(vector<double> mpki, vector<long> avgs, uint64_t cpu, uint64_t mem, double ipc, double mlp) {
+string build_metric_msg() {
 	string res = "";
-	res += to_string(ipc) + "@";
-	res += to_string(mlp) + "@";
+	res += to_string(ipc) + ",";
+	res += to_string(mlp) + ",";
 
 	for (double item : mpki) {
-		res += to_string(item) + "@";
+		res += to_string(item) + ",";
 	}
 
 	for (long item : avgs) {
-		res += to_string(item) + "@";
+		res += to_string(item) + ",";
 	}
 
-	res += to_string(cpu) + "@";
-	res += to_string(mem) + "@";
-	res += to_string(membw) + "@";
+	res += to_string(cpu_util) + ",";
+	res += to_string(mem_util) + ",";
+	res += to_string(membw) + ",";
 	res += to_string(iobw);
 	
 	return res;
 }
 
-void write_sock(int sock, string msg) {
-	write(sock, msg.c_str(), msg.size());
+void read_sock(int sock, string file_name) {
+	char buf[4096];
+	string head_names = "activationId,funcName,";
+	string head_cycle_related = "IPC,MLP,";
+	string head_mpki = "branch,L1D,L1I,LLC,dTLB,iTLB,L2,";
+	string head_avg = "cpuClock,pageFault,cpuMigration,contextSwitch,";
+	string head_others = "cpuUtil,memUtil,memBW,ioBW";
+	string header = head_names + head_cycle_related + head_mpki + head_avg + head_others + "\n";
+
+	ofstream out_file(file_name);
+	out_file << header;
+	out_file.close();
+
+	while (!stop) {
+		int len = read(sock, buf, 4095);
+		buf[len] = '\0';
+
+		if (len == 0) {
+			continue;
+		}
+
+		vector<string> split_msg;
+		boost::algorithm::split(split_msg, buf, boost::is_any_of("*"));
+		out_file.open(file_name, ios_base::app);
+
+		for (string msg : split_msg) {
+			if (msg.size() == 0) {
+				continue;
+			}
+
+			if (msg.find("func----") == string::npos) {
+				string data = string(msg) + "," + metric_msg + "\n";
+				printf("data: %s", data.c_str());
+				out_file << data;	
+			}
+			else {
+				stop = true;
+			}
+		}
+		out_file.close();
+
+	}
+
 }
 
 int membw_mon(int interval) {
 	double interval_ms = interval / 1000.0;
 	string cmd = "perf stat -M DRAM_BW_Use sleep " + to_string(interval_ms) + " 2>&1";
 
-	while (true) {
+	while (!stop) {
 		FILE *p = popen(cmd.c_str(), "r");
 
 		if (p == NULL) {
@@ -110,7 +143,7 @@ int membw_mon(int interval) {
 
 		char buf[4096];
 		int cnt = 0;
-		// auto start = chrono::system_clock::now();
+
 		while (fgets(buf, 4096, p)) {
 			string res = buf;
 			if (cnt == 0) {
@@ -127,9 +160,6 @@ int membw_mon(int interval) {
 			}
 			cnt++;
 		}
-		// auto end = chrono::system_clock::now();
-		// printf("membw: %lf\n", membw);
-		// printf("membw duration: %ld ms\n", chrono::duration_cast<chrono::milliseconds>(end - start).count());
 	}
 	return 0;
 }
@@ -137,7 +167,7 @@ int membw_mon(int interval) {
 int iobw_mon(int interval) {
 	string cmd = "iostat -d";
 
-	while (true) {
+	while (!stop) {
 		FILE *p = popen(cmd.c_str(), "r");
 
 		if (p == NULL) {
@@ -177,14 +207,14 @@ int iobw_mon(int interval) {
 }
 
 uint64_t update_cpu_ns() {
-	std::ifstream stream("/sys/fs/cgroup/cpu/cpuacct.usage_percpu");
-	std::string reader;
-	std::getline(stream, reader);
+	ifstream stream("/sys/fs/cgroup/cpu/cpuacct.usage_percpu");
+	string reader;
+	getline(stream, reader);
 	uint64_t avg_cpu = 0;
 
 	boost::trim_right(reader);
-	std::vector<std::string> str_ns;
-	std::vector<uint64_t> cur_ns;
+	vector<std::string> str_ns;
+	vector<uint64_t> cur_ns;
 	boost::algorithm::split(str_ns, reader, boost::is_any_of(" "));
 
 	for (auto item : str_ns) {
@@ -200,7 +230,7 @@ uint64_t update_cpu_ns() {
 
 	stream.close();
 
-	printf("avg_cpu: %lu\n", avg_cpu);
+	// printf("avg_cpu: %lu\n", avg_cpu);
 	return avg_cpu;
 }
 
@@ -225,7 +255,7 @@ uint64_t read_mem_util() {
 	in_use = total - available;
 	stream.close();
 
-	printf("mem_util: %lu\n", in_use);
+	// printf("mem_util: %lu\n", in_use);
 	return in_use;
 }
 
@@ -241,10 +271,8 @@ struct per_cpu_event {
 	long long *count;
 };
 
-void accumulate_metrics(struct per_cpu_event *cpu, int num_events, uint64_t cpu_util, uint64_t mem_util) {
+void accumulate_metrics(struct per_cpu_event *cpu, int num_events) {
 	vector<long long> total_per_event(num_events);
-	vector<double> mpki;
-	vector<long> avgs;
 	int num_avail_cores = 0;
 
 	for (int i = 0; i < num_cores; i++) {
@@ -266,33 +294,38 @@ void accumulate_metrics(struct per_cpu_event *cpu, int num_events, uint64_t cpu_
 	}
 
 	long total_inst = total_per_event[1];
-	double ipc = double(total_inst) / double(total_per_event[0]);
-	double mlp = double(total_per_event[13]) / double(total_per_event[14]);
+	ipc = double(total_inst) / double(total_per_event[0]);
+	mlp = double(total_per_event[13]) / double(total_per_event[14]);
 
+	long avg_clock = total_per_event[3] / num_avail_cores;
 	for (int i = 3; i < 7; i++) {
-		avgs.push_back(total_per_event[i] / num_avail_cores);
+		avgs[i - 3] = total_per_event[i] / num_avail_cores;
+		// avgs.push_back(total_per_event[i] / num_avail_cores);
 	}
 
 	double branch_mpki = double(total_per_event[2]) / double(total_inst);
-	mpki.push_back(branch_mpki);
+	mpki[0] = branch_mpki;
+	// mpki.push_back(branch_mpki);
 	for (int i = 7; i < 13; i++) {
 		double tmp_mpki = double(total_per_event[i]) / double(total_inst);
-		mpki.push_back(tmp_mpki);
+		mpki[i - 6] = tmp_mpki;
+		// mpki.push_back(tmp_mpki);
 	}
 
-	build_msg(mpki, avgs, cpu_util, mem_util, ipc, mlp);
+	metric_msg = build_metric_msg();
 
+	/*
 	printf("Number of available cores: %d\n", num_avail_cores);
 	printf("==========\n");
 	printf("IPC: %lf\n", ipc);
 	printf("MLP: %lf\n", mlp);
 	// printf("Cycles: %ld\n", avg_per_event[0]);
 	// printf("Instructions: %ld\n", avg_per_event[1]);
-	printf("Branch misses: %lf\n", mpki[0]);	// MPKI
 	printf("CPU clock: %ld\n", avgs[0]);	// avg
 	printf("Page faults: %ld\n", avgs[1]);	// avg
 	printf("CPU migrations: %ld\n", avgs[2]);	// avg
 	printf("Context switches: %ld\n", avgs[3]);	// avg
+	printf("Branch misses: %lf\n", mpki[0]);	// MPKI
 	printf("L1D read misses: %lf\n", mpki[1]);	// MPKI
 	printf("L1I read misses: %lf\n", mpki[2]);	// MPKI
 	printf("LLC read misses: %lf\n", mpki[3]);	// MPKI
@@ -300,6 +333,7 @@ void accumulate_metrics(struct per_cpu_event *cpu, int num_events, uint64_t cpu_
 	printf("ITLB read misses: %lf\n", mpki[5]);	// MPKI
 	printf("l2_rqsts.all_demand_miss: %lf\n", mpki[6]);	// MPKI
 	printf("==========\n");	
+	*/
 
 }
 
@@ -370,7 +404,7 @@ int perf_count_multicore(int interval, int sock) {
 	}
 
 	printf("Start monitoring!\n");
-	while(true) {
+	while(!stop) {
 
 		for (int i = 0; i < num_cores; i++) {
 			for (int j = 0; j < num_events; j++) {
@@ -389,11 +423,12 @@ int perf_count_multicore(int interval, int sock) {
 			}
 		}
 		auto end = chrono::system_clock::now();
-		uint64_t cpu_util = update_cpu_ns();
-		uint64_t mem_util = read_mem_util();
+		cpu_util = update_cpu_ns();
+		mem_util = read_mem_util();
 
-		printf("read duration: %ld us\n", chrono::duration_cast<chrono::microseconds>(end - start).count());
-		accumulate_metrics(cpu, num_events, cpu_util, mem_util);
+		// printf("read duration: %ld us\n", chrono::duration_cast<chrono::microseconds>(end - start).count());
+		accumulate_metrics(cpu, num_events);
+		// printf("msg: %s\n", metric_msg.c_str());
 	}
 
 	for (int i = 0; i < num_cores; i++) {
@@ -407,9 +442,12 @@ int perf_count_multicore(int interval, int sock) {
 }
 
 int main() {
-	// int sock = sock_bind_and_accept();
+	string file_name = "./data/only_metric.csv";
+	int sock = sock_create_connect("127.0.0.1");
 	int mon_interval = 100;	// ms
 
+	thread sock_read(read_sock, sock, file_name);
+	// /*
 	thread perf(perf_count_multicore, mon_interval, -1);
 	thread membw(membw_mon, mon_interval);
 	thread iobw(iobw_mon, mon_interval);
@@ -417,6 +455,8 @@ int main() {
 	perf.join();
 	membw.join();
 	iobw.join();
+	// */
+	sock_read.join();
 
 	return 0;
 }

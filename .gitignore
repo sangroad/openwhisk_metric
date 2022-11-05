@@ -102,4 +102,6 @@ core/routemgmt/getApi/utils.js
 
 # pickme
 mon_data/
-monitor
+prev_mon_data/
+monitor/monitor
+monitor/data
