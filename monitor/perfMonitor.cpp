@@ -441,13 +441,25 @@ int perf_count_multicore(int interval, int sock) {
 	return 0;
 }
 
-int main() {
-	string file_name = "./data/only_metric.csv";
-	int sock = sock_create_connect("127.0.0.1");
+int main(int argc, char *argv[]) {
+	string users;
+	if (argc > 1) {
+		users = argv[1];
+	}
+	else {
+		printf("specify number of users!\n");
+		return -1;
+	}
+
+	string file_name = "./data/only_metric_" + users + ".csv";
 	int mon_interval = 100;	// ms
 
+	int sock = sock_create_connect("127.0.0.1");
+	if (sock == -1) {
+		return -1;
+	}
+
 	thread sock_read(read_sock, sock, file_name);
-	// /*
 	thread perf(perf_count_multicore, mon_interval, -1);
 	thread membw(membw_mon, mon_interval);
 	thread iobw(iobw_mon, mon_interval);
@@ -455,7 +467,6 @@ int main() {
 	perf.join();
 	membw.join();
 	iobw.join();
-	// */
 	sock_read.join();
 
 	return 0;

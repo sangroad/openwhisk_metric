@@ -21,13 +21,12 @@ from pathlib import Path
 parser = argparse.ArgumentParser()
 parser.add_argument('--limit', dest='limit', type=int, default=200000)
 parser.add_argument('--since', dest='since', type=int, required=True)
-parser.add_argument('--output-dir', dest='output_dir', type=str, required=True)
+parser.add_argument('--users', dest='users', type=str, required=True)
 parser.add_argument('--detail-lat', dest='detail_lat', action='store_true')
 
 args = parser.parse_args()
 since = int(args.since)
 limit = args.limit
-output_dir = Path(args.output_dir)
 
 # CouchDB (from #OPENWHISK_DIR/ansible/db_local.ini)
 '''
@@ -80,8 +79,8 @@ def get_activation_since(since, limit=100000):
 
 # read activation data from db
 activations = get_activation_since(since=since, limit=limit)
-metric_file = open('./data/only_metric.csv')
-result_file = open('./data/data1.csv', 'w')
+metric_file = open(f'./data/only_metric_{args.users}.csv')
+result_file = open(f'./data/data_{args.users}.csv', 'w')
 
 metric_reader = csv.reader(metric_file)
 result_writer = csv.writer(result_file, delimiter=',')
