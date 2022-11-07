@@ -116,7 +116,7 @@ void read_sock(int sock, string file_name) {
 
 			if (msg.find("func----") == string::npos) {
 				string data = string(msg) + "," + metric_msg + "\n";
-				printf("data: %s", data.c_str());
+				// printf("data: %s", data.c_str());
 				out_file << data;	
 			}
 			else {
