@@ -22,6 +22,7 @@ class OpenWhiskUser(HttpUser):
 	def wait_time(self):
 		return np.random.exponential(scale=self.beta)
 
+	"""
 	def on_stop(self):
 		params = {}
 		params["blocking"] = "false"
@@ -32,6 +33,7 @@ class OpenWhiskUser(HttpUser):
 
 		if r.status_code > 300:
 			logging.warning("func---- resp.status: %d, text: %s" % (r.status_code, r.text))
+	"""
 
 
 	@task(1)
