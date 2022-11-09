@@ -92,6 +92,7 @@ void read_sock(int sock, string file_name) {
 	string head_avg = "cpuClock,pageFault,cpuMigration,contextSwitch,";
 	string head_others = "cpuUtil,memUtil,memBW,ioBW";
 	string header = head_names + head_cycle_related + head_mpki + head_avg + head_others + "\n";
+	int cnt = 0;
 
 	ofstream out_file(file_name);
 	out_file << header;
@@ -113,18 +114,13 @@ void read_sock(int sock, string file_name) {
 			if (msg.size() == 0) {
 				continue;
 			}
-
-			if (msg.find("func----") == string::npos) {
-				string data = string(msg) + "," + metric_msg + "\n";
-				// printf("data: %s", data.c_str());
-				out_file << data;	
-			}
-			else {
-				stop = true;
-			}
+			string data = string(msg) + "," + metric_msg + "\n";
+			// printf("data: %s", data.c_str());
+			out_file << data;
+			cnt++;
+			// printf("Number of recorded actions: %d\n", cnt);
 		}
 		out_file.close();
-
 	}
 
 }
@@ -160,6 +156,8 @@ int membw_mon(int interval) {
 			}
 			cnt++;
 		}
+
+		pclose(p);
 	}
 	return 0;
 }
@@ -201,6 +199,7 @@ int iobw_mon(int interval) {
 
 		}
 		this_thread::sleep_for(chrono::milliseconds(interval));
+		pclose(p);
 	}
 
 	return 0;
@@ -261,9 +260,8 @@ uint64_t read_mem_util() {
 
 static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu,
 		int group_fd, unsigned long flags) {
-	int ret;
-	ret = syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
-	return ret;
+	
+	return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
 }
 
 struct per_cpu_event {
@@ -337,27 +335,27 @@ void accumulate_metrics(struct per_cpu_event *cpu, int num_events) {
 
 }
 
-int perf_count_multicore(int interval, int sock) {
+int perf_count_multicore(int interval) {
 
 	struct perf_event_attr pe_def[] = {
-		{ .type = PERF_TYPE_HARDWARE, .config = PERF_COUNT_HW_CPU_CYCLES },
-		{ .type = PERF_TYPE_HARDWARE, .config = PERF_COUNT_HW_INSTRUCTIONS },
-		{ .type = PERF_TYPE_HARDWARE, .config = PERF_COUNT_HW_BRANCH_MISSES },
+		{ .type = PERF_TYPE_HARDWARE, .config = PERF_COUNT_HW_CPU_CYCLES, .exclude_kernel = 1 },
+		{ .type = PERF_TYPE_HARDWARE, .config = PERF_COUNT_HW_INSTRUCTIONS, .exclude_kernel = 1 },
+		{ .type = PERF_TYPE_HARDWARE, .config = PERF_COUNT_HW_BRANCH_MISSES, .exclude_kernel = 1 },
 
-		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_CPU_CLOCK },
-		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_PAGE_FAULTS },
-		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_CPU_MIGRATIONS },
-		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_CONTEXT_SWITCHES },
+		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_CPU_CLOCK, .exclude_kernel = 1 },
+		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_PAGE_FAULTS, .exclude_kernel = 1 },
+		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_CPU_MIGRATIONS, .exclude_kernel = 0 },
+		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_CONTEXT_SWITCHES, .exclude_kernel = 0 },
 
-		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_L1D) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16) },
-		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_L1I) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16) },
-		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_LL) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16) },
-		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16) },
-		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_ITLB) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16) },
+		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_L1D) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 1 },
+		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_L1I) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 1 },
+		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_LL) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 1 },
+		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 1 },
+		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_ITLB) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 1 },
 
-		{ .type = PERF_TYPE_RAW, .config = 0x2724 },	// l2_rqsts.all_demand_miss -> exclude prefetch miss
-		{ .type = PERF_TYPE_RAW, .config = 0x148 },		// l1d_pend_miss.pending
-		{ .type = PERF_TYPE_RAW, .config = 0x1000148 },	// l1d_pend_miss.pending_cycles
+		{ .type = PERF_TYPE_RAW, .config = 0x2724, .exclude_kernel = 1 },	// l2_rqsts.all_demand_miss -> exclude prefetch miss
+		{ .type = PERF_TYPE_RAW, .config = 0x148, .exclude_kernel = 1 },		// l1d_pend_miss.pending
+		{ .type = PERF_TYPE_RAW, .config = 0x1000148, .exclude_kernel = 1 },	// l1d_pend_miss.pending_cycles
 		/*
 		{ .type = PERF_TYPE_RAW, .config = 0xc0},	// inst_retired.any
 		{ .type = PERF_TYPE_RAW, .config = 0x8d1},	// mem_load_retired.l1_miss
@@ -387,13 +385,13 @@ int perf_count_multicore(int interval, int sock) {
 	memset(&pe, 0, sizeof(struct perf_event_attr));
 	pe.size = sizeof(struct perf_event_attr);
 	pe.disabled = 1;
-	pe.exclude_kernel = 1;
 	pe.exclude_hv = 1;
 
 	for (int i = 0; i < num_cores; i++) {
 		for (int j = 0; j < num_events; j++) {
 			pe.type = pe_def[j].type;
 			pe.config = pe_def[j].config;
+			pe.exclude_kernel = pe_def[j].exclude_kernel;
 			cpu[i].fd[j] = perf_event_open(&pe, -1, i, -1, 0);
 
 			if (cpu[i].fd[j] == -1) {
@@ -443,15 +441,18 @@ int perf_count_multicore(int interval, int sock) {
 
 int main(int argc, char *argv[]) {
 	string users;
-	if (argc > 1) {
+	string runtime;
+
+	if (argc > 2) {
 		users = argv[1];
+		runtime = argv[2];
 	}
 	else {
-		printf("specify number of users!\n");
+		printf("specify number of users and runtime!\n");
 		return -1;
 	}
 
-	string file_name = "./data/only_metric_" + users + ".csv";
+	string file_name = "./data/only_metric_" + users + "_" + runtime + ".csv";
 	int mon_interval = 100;	// ms
 
 	int sock = sock_create_connect("127.0.0.1");
@@ -460,7 +461,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	thread sock_read(read_sock, sock, file_name);
-	thread perf(perf_count_multicore, mon_interval, -1);
+	thread perf(perf_count_multicore, mon_interval);
 	thread membw(membw_mon, mon_interval);
 	thread iobw(iobw_mon, mon_interval);
 
