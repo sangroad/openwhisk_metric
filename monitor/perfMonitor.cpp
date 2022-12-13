@@ -442,18 +442,21 @@ int perf_count_multicore(int interval) {
 int main(int argc, char *argv[]) {
 	string users;
 	string runtime;
+	string interval;
 
-	if (argc > 2) {
+	if (argc > 3) {
 		users = argv[1];
 		runtime = argv[2];
+		interval = argv[3];
 	}
 	else {
-		printf("specify number of users and runtime!\n");
+		printf("specify number of users, runtime and monitoring interval!\n");
 		return -1;
 	}
 
-	string file_name = "./data/only_metric_" + users + "_" + runtime + ".csv";
-	int mon_interval = 100;	// ms
+	string file_name = "./data/only_metric_" + users + "_" + runtime + "_" + interval + "ms.csv";
+	// int mon_interval = 100;	// ms
+	int mon_interval = stoi(interval);
 
 	int sock = sock_create_connect("127.0.0.1");
 	if (sock == -1) {
