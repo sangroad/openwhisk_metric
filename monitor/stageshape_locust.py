@@ -1,9 +1,10 @@
 import logging
-from locust import HttpUser, task, tag, LoadTestShape, constant_throughput, event
+from locust import HttpUser, task, tag, LoadTestShape, constant_throughput, events
 import urllib3
 import json
 import random
 import numpy as np
+import math
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logging.basicConfig(level=logging.INFO)
 
@@ -15,28 +16,11 @@ class OpenWhiskUser(HttpUser):
 	url_web = '/api/v1/web/guest/default/'
 	beta = 1.0
 	data_cache = {}
-	# bench_num = 25
-	# bench_num = 40
-	bench_num = 30
-	# bench_num = 80
+	bench_num = 20
 	# wait_time = constant_throughput(1)
 
 	def wait_time(self):
 		return np.random.exponential(scale=self.beta)
-
-	'''
-	def on_stop(self):
-		params = {}
-		params['blocking'] = 'false'
-		params['result'] = 'true'
-		url = self.url_noweb + 'func----'
-
-		r = self.client.post(url, params=params, auth=self.auth, verify=False, name='/last')
-
-		if r.status_code > 300:
-			logging.warning('func---- resp.status: %d, text: %s' % (r.status_code, r.text))
-	'''
-
 
 	@task(1)
 	@tag('base64')
@@ -54,21 +38,6 @@ class OpenWhiskUser(HttpUser):
 			logging.warning('base64 resp.status: %d, text: %s' % (r.status_code, r.text))
 
 	@task(1)
-	@tag('http')
-	def http(self):
-		params = {}
-		params['blocking'] = 'false'
-		params['result'] = 'true'
-
-		num = random.randint(0, self.bench_num)
-		url = self.url_noweb + 'http-' + str(num).zfill(2)
-
-		r = self.client.post(url, params=params, auth=self.auth, verify=False, name='/http')
-
-		if r.status_code > 300:
-			logging.warning('http-endpoint resp.status: %d, text: %s' % (r.status_code, r.text))
-
-	@task(1)
 	@tag('primes')
 	def primes(self):
 		params = {}
@@ -82,21 +51,6 @@ class OpenWhiskUser(HttpUser):
 
 		if r.status_code > 300:
 			logging.warning('primes resp.status: %d, text: %s' % (r.status_code, r.text))
-
-	@task(0)
-	@tag('chameleon')
-	def chameleon(self):
-		params = {}
-		params['blocking'] = 'false'
-		params['result'] = 'true'
-
-		num = random.randint(0, self.bench_num)
-		url = self.url_noweb + 'cham-' + str(num).zfill(2)
-
-		r = self.client.post(url, params=params, auth=self.auth, verify=False, name='/chameleon')
-
-		if r.status_code > 300:
-			logging.warning('chameleon resp.status: %d, text: %s' % (r.status_code, r.text))
 
 	@task(1)
 	@tag('img_resize')
@@ -128,21 +82,6 @@ class OpenWhiskUser(HttpUser):
 		if r.status_code > 300:
 			logging.warning('markdown resp.status: %d, text: %s' % (r.status_code, r.text))
 
-	@task(0)
-	@tag('mobilenet')
-	def mobilenet(self):
-		params = {}
-		params['blocking'] = 'false'
-		params['result'] = 'true'
-
-		num = random.randint(0, self.bench_num)
-		url = self.url_web + 'mobi-' + str(num).zfill(2)
-
-		r = self.client.post(url, params=params, auth=self.auth, verify=False, name='/mobilenet')
-
-		if r.status_code > 300:
-			logging.warning('mobilenet resp.status: %d, text: %s' % (r.status_code, r.text))
-
 	@task(1)
 	@tag('img_processing')
 	def img_processing(self):
@@ -158,17 +97,22 @@ class OpenWhiskUser(HttpUser):
 		if r.status_code > 300:
 			logging.warning('imgprocessing resp.status: %d, text: %s' % (r.status_code, r.text))
 
-	@task(0)
-	@tag('sentiment')
-	def sentiment(self):
-		params = {}
-		params['blocking'] = 'false'
-		params['result'] = 'true'
 
-		num = random.randint(0, self.bench_num)
-		url = self.url_noweb + 'sent-' + str(num).zfill(2)
+class StageShape(LoadTestShape):
+	SECONDS_PER_MINUTE = 60
+	timelimit = 60 * SECONDS_PER_MINUTE
 
-		r = self.client.post(url, params=params, auth=self.auth, verify=False, name='/sentiment')
+	start_user = 15
+	step_time = 15 * SECONDS_PER_MINUTE
+	step_user = 5
 
-		if r.status_code > 300:
-			logging.warning('sentiment resp.status: %d, text: %s' % (r.status_code, r.text))
+	def tick(self):
+		run_time = self.get_run_time()
+
+		if run_time > self.timelimit:
+			return None
+
+		cur_step = math.floor(run_time / self.step_time)
+		cur_user = self.start_user + self.step_user * cur_step
+
+		return (cur_user, cur_user)
