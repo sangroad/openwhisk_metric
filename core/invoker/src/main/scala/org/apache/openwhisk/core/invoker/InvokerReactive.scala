@@ -140,9 +140,12 @@ class InvokerReactive(
 
   private val collectLogs = new LogStoreCollector(logsProvider)
 
-  /* [pickme] periodically send metrics to RDMA process */
+  /*
+  [pickme] periodically send metrics to RDMA process
+  (not send periodically)
+  */
   private val pickmeConnector = Some(actorSystem.actorOf(Props {new PICKMEConnector(processActivationMessage)}))
-  actorSystem.scheduler.schedule(0.second, 30.millisecond, pickmeConnector.get, Tick())
+  // actorSystem.scheduler.schedule(0.second, 30.millisecond, pickmeConnector.get, Tick())
   private var prevActivationId: String = ""
   // private val periodicMonitor = actorSystem.actorOf(Props {
   //   new PeriodicMonitor()

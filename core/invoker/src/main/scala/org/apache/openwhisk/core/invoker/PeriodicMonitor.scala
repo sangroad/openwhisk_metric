@@ -4,7 +4,7 @@ import akka.actor.{ Actor, ActorSystem, Props }
 import org.apache.openwhisk.core.containerpool.{ PICKMEBackgroundMonitor, PICKMESocketServer }
 import org.apache.openwhisk.core.containerpool.ContainerProxy
 import org.apache.openwhisk.core.containerpool.ContainerPool
-import org.apache.openwhisk.core.containerpool.PICKMEPeriodicData
+// import org.apache.openwhisk.core.containerpool.PICKMEPeriodicData
 import scala.concurrent.Future
 import akka.util.ByteString
 
@@ -33,6 +33,6 @@ class PICKMEConnector(handler: Array[Byte] => Future[Unit]) extends Actor {
 			val busypool = ContainerPool.busyPool.size
 			val freepool = ContainerPool.freePool.size
 
-			socket ! PICKMEPeriodicData(busypool, freepool, initializing, creating)
+			// socket ! PICKMEPeriodicData(busypool, freepool, initializing, creating)
 	}
 }

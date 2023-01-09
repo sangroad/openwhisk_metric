@@ -38,12 +38,15 @@ class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extend
           /* send container status */
           connection ! Write(data)
         case data: PICKMEPeriodicData =>
-          /* send openwhisk-side metrics to RDMA process */
+          /* 
+          send openwhisk-side metrics to RDMA process
+          (not used now)
+          */
           val strData = s"*${data.busyPoolSize}@${data.freePoolSize}@${data.initContainers}@${data.creatingContainers}"
           if (strData != prevPeriodic) {
             prevPeriodic = strData
             val sendData = ByteString(strData)
-            connection ! Write(sendData)
+            // connection ! Write(sendData)
           }
         case data: PICKMESocketData =>
           /* for ML metric collection */
