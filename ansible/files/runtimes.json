@@ -13,14 +13,14 @@
         "This file is meant to list all stable runtimes supported by the Apache Openwhisk community."
     ],
     "runtimes": {
-        "python": [
+        "nodejs": [
             {
-                "kind": "python:3",
+                "kind": "nodejs:10",
                 "default": true,
                 "image": {
                     "prefix": "openwhisk",
-                    "name": "action-python-v3.7",
-                    "tag": "1.17.0"
+                    "name": "action-nodejs-v10",
+                    "tag": "1.16.0"
                 },
                 "deprecated": false,
                 "attached": {

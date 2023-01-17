@@ -1,2 +1,2 @@
 #!/bin/bash
-g++ -o monitor perfMonitor.cpp -lpthread
+g++-8 -o monitor perfMonitor.cpp -lpthread
