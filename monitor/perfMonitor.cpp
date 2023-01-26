@@ -171,45 +171,41 @@ int membw_mon(int interval) {
 	return 0;
 }
 
-int iobw_mon(int interval) {
+int iobw_mon() {
 	string cmd = "iostat -d";
+	FILE *p = popen(cmd.c_str(), "r");
 
-	while (!stop) {
-		FILE *p = popen(cmd.c_str(), "r");
-
-		if (p == NULL) {
-			printf("popen() failure\n");
-			return -1;
-		}
-
-		char buf[4096];
-		int cnt = 0;
-		iobw = 0;
-		while (fgets(buf, 4096, p)) {
-			string res = buf;
-
-			if (cnt > 2) {
-				vector<string> splitted;
-				boost::algorithm::split(splitted, res, boost::is_any_of("\t "));
-				int data_cnt = 0;
-				for (string spt : splitted) {
-					if (spt.size() == 0) {
-						continue;
-					}
-
-					if (data_cnt == 2 | data_cnt == 3) {
-						iobw += stof(spt);
-					}
-					data_cnt++;
-				}
-			}
-
-			cnt++;
-
-		}
-		this_thread::sleep_for(chrono::milliseconds(interval));
-		pclose(p);
+	if (p == NULL) {
+		printf("popen() failure\n");
+		return -1;
 	}
+
+	char buf[4096];
+	int cnt = 0;
+	iobw = 0;
+	while (fgets(buf, 4096, p)) {
+		string res = buf;
+
+		if (cnt > 2) {
+			vector<string> splitted;
+			boost::algorithm::split(splitted, res, boost::is_any_of("\t "));
+			int data_cnt = 0;
+			for (string spt : splitted) {
+				if (spt.size() == 0) {
+					continue;
+				}
+
+				if (data_cnt == 2 | data_cnt == 3) {
+					iobw += stof(spt);
+				}
+				data_cnt++;
+			}
+		}
+
+		cnt++;
+
+	}
+	pclose(p);
 
 	return 0;
 }
@@ -322,7 +318,6 @@ void accumulate_metrics(struct per_cpu_event *cpu, int num_events) {
 	long l1d_pending_cycles = total_per_event[13];	// for MLP
 
 	ipc = double(total_inst) / double(total_cycles);
-	// printf("ipc: %lf\n", ipc);
 	mlp = double(l1d_pending) / double(l1d_pending_cycles);
 
 	long avg_clock = cpu_clock / num_avail_cores;
@@ -364,7 +359,7 @@ void accumulate_metrics(struct per_cpu_event *cpu, int num_events) {
 
 	metric_msg = build_metric_msg();
 
-	// /*
+	/*
 	printf("Number of available cores: %d\n", num_avail_cores);
 	printf("==========\n");
 	printf("IPC: %lf\n", ipc);
@@ -382,7 +377,7 @@ void accumulate_metrics(struct per_cpu_event *cpu, int num_events) {
 	printf("ITLB read misses: %lf\n", mpki[4]);	// MPKI
 	printf("l2_rqsts.all_demand_miss: %lf\n", mpki[5]);	// MPKI
 	printf("==========\n");	
-	// */
+	*/
 
 }
 
@@ -422,7 +417,7 @@ int perf_count_multicore(int interval) {
 		*/
 	};
 
-	int max_per_one_read = 12;
+	int max_per_one_read = 11;
 	int num_events = sizeof(pe_def) / sizeof(struct perf_event_attr);
 	int num_exclude = num_events - max_per_one_read;
 
@@ -469,10 +464,10 @@ int perf_count_multicore(int interval) {
 			if (!exclude[tmp]) {
 				exclude[tmp] = true;
 				exclude_cnt++;
-				printf("%d: %d, ", exclude_cnt, tmp);
+				// printf("%d: %d, ", exclude_cnt, tmp);
 			}
 		}
-		printf("\n");
+		// printf("\n");
 
 
 		auto start = chrono::system_clock::now();
@@ -517,6 +512,7 @@ int perf_count_multicore(int interval) {
 		auto end = chrono::system_clock::now();
 		cpu_util = update_cpu_ns();
 		mem_util = read_mem_util();
+		iobw_mon();
 
 		// printf("read duration: %ld ms\n", chrono::duration_cast<chrono::milliseconds>(end - start).count());
 		accumulate_metrics(cpu, num_events);
@@ -539,7 +535,6 @@ int main(int argc, char *argv[]) {
 	string runtime;
 	string interval;
 
-	/*
 	if (argc > 3) {
 		users = argv[1];
 		runtime = argv[2];
@@ -549,26 +544,25 @@ int main(int argc, char *argv[]) {
 		printf("specify number of users, runtime and monitoring interval!\n");
 		return -1;
 	}
-	*/
 
 	string file_name = "./data/only_metric_" + users + "_" + runtime + "_" + interval + "ms.csv";
-	int mon_interval = 100;	// ms
-	// int mon_interval = stoi(interval);
+	// int mon_interval = 100;	// ms
+	int mon_interval = stoi(interval);
 
-	// int sock = sock_create_connect("127.0.0.1");
-	// if (sock == -1) {
-	// 	return -1;
-	// }
+	int sock = sock_create_connect("127.0.0.1");
+	if (sock == -1) {
+		return -1;
+	}
 
-	// thread sock_read(read_sock, sock, file_name);
+	thread sock_read(read_sock, sock, file_name);
 	thread perf(perf_count_multicore, mon_interval);
 	// thread membw(membw_mon, mon_interval);
-	thread iobw(iobw_mon, mon_interval);
+	// thread iobw(iobw_mon, mon_interval);
 
 	perf.join();
 	// membw.join();
-	iobw.join();
-	// sock_read.join();
+	// iobw.join();
+	sock_read.join();
 
 	return 0;
 }
