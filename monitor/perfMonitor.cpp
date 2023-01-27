@@ -363,9 +363,9 @@ void accumulate_metrics(struct per_cpu_event *cpu, int num_events) {
 	printf("Number of available cores: %d\n", num_avail_cores);
 	printf("==========\n");
 	printf("IPC: %lf\n", ipc);
+	printf("Cycles: %ld\n", total_cycles);
+	printf("Instructions: %ld\n", total_inst);
 	printf("MLP: %lf\n", mlp);
-	// printf("Cycles: %ld\n", avg_per_event[0]);
-	// printf("Instructions: %ld\n", avg_per_event[1]);
 	printf("CPU clock: %ld\n", avgs[0]);	// avg
 	printf("Page faults: %ld\n", avgs[1]);	// avg
 	printf("CPU migrations: %ld\n", avgs[2]);	// avg
@@ -384,25 +384,25 @@ void accumulate_metrics(struct per_cpu_event *cpu, int num_events) {
 int perf_count_multicore(int interval) {
 
 	struct perf_event_attr pe_def[] = {
-		{ .type = PERF_TYPE_HARDWARE, .config = PERF_COUNT_HW_CPU_CYCLES, .exclude_kernel = 1 },
-		{ .type = PERF_TYPE_HARDWARE, .config = PERF_COUNT_HW_INSTRUCTIONS, .exclude_kernel = 1 },
-		{ .type = PERF_TYPE_HARDWARE, .config = PERF_COUNT_HW_BRANCH_MISSES, .exclude_kernel = 1 },
+		{ .type = PERF_TYPE_HARDWARE, .config = PERF_COUNT_HW_CPU_CYCLES, .exclude_kernel = 0 },
+		{ .type = PERF_TYPE_HARDWARE, .config = PERF_COUNT_HW_INSTRUCTIONS, .exclude_kernel = 0 },
+		{ .type = PERF_TYPE_HARDWARE, .config = PERF_COUNT_HW_BRANCH_MISSES, .exclude_kernel = 0 },
 
-		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_CPU_CLOCK, .exclude_kernel = 1 },
-		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_PAGE_FAULTS, .exclude_kernel = 1 },
+		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_CPU_CLOCK, .exclude_kernel = 0 },
+		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_PAGE_FAULTS, .exclude_kernel = 0 },
 		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_CPU_MIGRATIONS, .exclude_kernel = 0 },
 		{ .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_CONTEXT_SWITCHES, .exclude_kernel = 0 },
 
-		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_L1D) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 1 },
-		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_L1I) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 1 },
+		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_L1D) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 0 },
+		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_L1I) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 0 },
 		// not work in VM
 		// { .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_LL) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 1 },
-		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 1 },
-		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_ITLB) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 1 },
+		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 0 },
+		{ .type = PERF_TYPE_HW_CACHE, .config = (PERF_COUNT_HW_CACHE_ITLB) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), .exclude_kernel = 0 },
 
-		{ .type = PERF_TYPE_RAW, .config = 0x2724, .exclude_kernel = 1 },	// l2_rqsts.all_demand_miss -> exclude prefetch miss
-		{ .type = PERF_TYPE_RAW, .config = 0x148, .exclude_kernel = 1 },		// l1d_pend_miss.pending
-		{ .type = PERF_TYPE_RAW, .config = 0x1000148, .exclude_kernel = 1 }	// l1d_pend_miss.pending_cycles
+		{ .type = PERF_TYPE_RAW, .config = 0x2724, .exclude_kernel = 0 },	// l2_rqsts.all_demand_miss -> exclude prefetch miss
+		{ .type = PERF_TYPE_RAW, .config = 0x148, .exclude_kernel = 0 },		// l1d_pend_miss.pending
+		{ .type = PERF_TYPE_RAW, .config = 0x1000148, .exclude_kernel = 0 }	// l1d_pend_miss.pending_cycles
 		/*
 		{ .type = PERF_TYPE_RAW, .config = 0xc0},	// inst_retired.any
 		{ .type = PERF_TYPE_RAW, .config = 0x8d1},	// mem_load_retired.l1_miss
@@ -460,7 +460,7 @@ int perf_count_multicore(int interval) {
 		// pick metric to exclude this iteration
 		int exclude_cnt = 0;
 		while(exclude_cnt < num_exclude) {
-			int tmp = get_random_int(1, 11);
+			int tmp = get_random_int(2, 11);
 			if (!exclude[tmp]) {
 				exclude[tmp] = true;
 				exclude_cnt++;
@@ -559,10 +559,10 @@ int main(int argc, char *argv[]) {
 	// thread membw(membw_mon, mon_interval);
 	// thread iobw(iobw_mon, mon_interval);
 
+	sock_read.join();
 	perf.join();
 	// membw.join();
 	// iobw.join();
-	sock_read.join();
 
 	return 0;
 }
