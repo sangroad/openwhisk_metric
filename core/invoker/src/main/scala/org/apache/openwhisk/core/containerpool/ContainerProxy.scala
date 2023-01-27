@@ -18,6 +18,7 @@
 package org.apache.openwhisk.core.containerpool
 
 import akka.actor.Actor
+import akka.actor.ActorSystem
 import akka.actor.ActorRef
 import akka.actor.Cancellable
 import java.time.Instant
@@ -301,6 +302,8 @@ class ContainerProxy(factory: (TransactionId,
     case Event(job: Run, _) =>
       implicit val transid = job.msg.transid
       activeCount += 1
+      // pickme - send activation message to monitor (cold start)
+      ContainerProxy.pickmeSocket ! job.msg
 
       // pickme
       val sTime = System.nanoTime()
@@ -794,6 +797,12 @@ class ContainerProxy(factory: (TransactionId,
   def initializeAndRun(container: Container, job: Run, reschedule: Boolean = false, coldStartTime: Option[Interval] = None)(
     implicit tid: TransactionId): Future[WhiskActivation] = {
     
+    
+    // pickme - send activation message to monitor(warm start)
+    if (!coldStartTime.isDefined) {
+      ContainerProxy.pickmeSocket ! job.msg
+    }
+
     // pickme
     val sTime = System.nanoTime()
     ContainerProxy.initializing.next()
@@ -1044,6 +1053,9 @@ object ContainerProxy {
   private val containerCount = new Counter
   private val initializing = new Counter
   private val creating = new Counter
+
+	private val actorSystem = ActorSystem("PICKMESystem")
+  private val pickmeSocket = actorSystem.actorOf(Props[PICKMESocketServer], "PICKMESocketServer")
 
   val timeouts = loadConfigOrThrow[ContainerProxyTimeoutConfig](ConfigKeys.containerProxyTimeouts)
   val activationErrorLogging =
