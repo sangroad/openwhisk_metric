@@ -223,6 +223,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
               // Try to process the next item in buffer (or get another message from feed, if buffer is now empty)
               processBufferOrFeed()
             }
+            // [pickme]
+            println(s"[pickme] check containerpool. activ_id: ${r.msg.activationId}, time (ms): ${System.nanoTime()}")
             actor ! r // forwards the run request to the container
             logContainerStart(r, containerState, newData.activeActivationCount, container)
 

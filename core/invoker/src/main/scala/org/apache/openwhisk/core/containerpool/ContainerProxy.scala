@@ -307,7 +307,7 @@ class ContainerProxy(factory: (TransactionId,
       implicit val transid = job.msg.transid
       activeCount += 1
 
-      // pickme
+      // [pickme]
       ContainerProxy.creating.next()
       val createStart = Instant.now
 
@@ -359,6 +359,7 @@ class ContainerProxy(factory: (TransactionId,
           // pickme
           PICKMEBackgroundMonitor.setCreatingContainer(ContainerProxy.creating.prev())
           val createEnd = Instant.now
+          println(s"[pickme] create container end. activ_id: ${job.msg.activationId}, time (ns): ${System.nanoTime()}")
           // now attempt to inject the user code and run the action
           initializeAndRun(container, job, false, Option(Interval(createStart, createEnd))) // [pickme] add interval
             .map(_ => RunCompleted)
@@ -847,6 +848,7 @@ class ContainerProxy(factory: (TransactionId,
 
     val activation: Future[WhiskActivation] = initialize
       .flatMap { initInterval =>
+        // [pickme]
         //immediately setup warmedData for use (before first execution) so that concurrent actions can use it asap
         if (initInterval.isDefined) {
           self ! InitCompleted(WarmedData(container, job.msg.user.namespace.name, job.action, Instant.now, 1))
@@ -858,6 +860,7 @@ class ContainerProxy(factory: (TransactionId,
           "deadline" -> (Instant.now.toEpochMilli + actionTimeout.toMillis).toString.toJson)
 
         // pickme
+        println(s"[pickme] initialize container end. activ_id: ${job.msg.activationId}, time (ns): ${System.nanoTime()}")
         // logging.info(this, s"[pickme] initalize ~ run: ${(System.nanoTime - sTime) / 1000000}ms, concurrent running: ${ContainerProxy.initializing.prev()}")
         PICKMEBackgroundMonitor.setInitContainer(ContainerProxy.initializing.prev())
         // PICKMEActivationMonitor.setActivationInputSize(FuncInputSize(job.msg.activationId, parameters.toString().size))

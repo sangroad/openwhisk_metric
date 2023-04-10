@@ -261,6 +261,12 @@ class ShardingContainerPoolBalancer(
   override def publish(action: ExecutableWhiskActionMetaData, msg: ActivationMessage)(
     implicit transid: TransactionId): Future[Future[Either[ActivationId, WhiskActivation]]] = {
 
+    // [pickme]
+    import java.time.Instant
+    import org.apache.openwhisk.core.containerpool.Interval
+    println(s"[pickme] start ~ loadbalancer. activ_id: ${msg.activationId}, time (ms): ${Interval(msg.transid.meta.start, Instant.now).duration.toMillis}")
+    println(s"[pickme] Send msg to RDMA. activ_id: ${msg.activationId}, time (ms): ${Instant.now().toEpochMilli()}")
+
     val isBlackboxInvocation = action.exec.pull
     val actionType = if (!isBlackboxInvocation) "managed" else "blackbox"
     val (invokersToUse, stepSizes) =

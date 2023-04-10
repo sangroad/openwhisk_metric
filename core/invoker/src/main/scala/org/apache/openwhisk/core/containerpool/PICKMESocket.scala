@@ -64,11 +64,10 @@ class PICKMESocketServer(port: Int, handler: Array[Byte] => Future[Unit]) extend
           val received = data.utf8String
           val ret = received.split('*').foreach { msg =>
             if (msg.length() != 0) {
-              val justReceived = Instant.now().toEpochMilli()
               val msgPart = msg.substring(0, determineLength)
               if (!prevActivationSet(msgPart)) {
                 val addFlag = msg + PICKMEflag
-                println(s"[pickme] received data: ${addFlag}")
+                println(s"[pickme] received from RDMA. msg: ${addFlag}, time (ms): ${Instant.now().toEpochMilli()}, time (ns): ${System.nanoTime()}")
                 prevActivationSet += msgPart
                 prevActivationQueue += msgPart
 

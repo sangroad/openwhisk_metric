@@ -194,6 +194,7 @@ class InvokerReactive(
       .flatMap(action => {
         action.toExecutableWhiskAction match {
           case Some(executable) =>
+            println(s"[pickme] retrieve code. activ_id: ${msg.activationId}, time (ns): ${System.nanoTime()}")
             pool ! Run(executable, msg)
             Future.successful(())
           case None =>
