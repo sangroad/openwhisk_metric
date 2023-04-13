@@ -213,7 +213,8 @@ protected case class TransactionMetadata(id: String,
                                          start: Instant,
                                          extraLogging: Boolean = false,
                                          parent: Option[TransactionMetadata] = None,
-                                         var invokerStart: Option[Instant] = None) {
+                                         var invokerStart: Option[Instant] = None,
+                                         var queueLen: Option[Int] = None) {
   override def toString = s"#tid_$id"
 }
 

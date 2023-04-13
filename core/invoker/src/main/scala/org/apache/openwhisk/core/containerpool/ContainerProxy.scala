@@ -1111,11 +1111,15 @@ object ContainerProxy {
     }
 
     val coldTime = {
-      coldStartInterval.map(coldTime => Parameters("coldstartTime", coldTime.duration.toMillis.toJson))
+      coldStartInterval.map(coldTime => Parameters("creationTime", coldTime.duration.toMillis.toJson))
     }
 
     val invokerWaitTime = {
       invokerInterval.map(invokerTime => Parameters("invokerWaitTime", invokerTime.duration.toMillis.toJson))
+    }
+
+    val queueLength = {
+      job.msg.transid.meta.queueLen.map(length => Parameters("queueLength", JsNumber(length)))
     }
 
     val binding =
@@ -1137,7 +1141,7 @@ object ContainerProxy {
           Parameters(WhiskActivation.pathAnnotation, JsString(job.action.fullyQualifiedName(false).asString)) ++
           Parameters(WhiskActivation.kindAnnotation, JsString(job.action.exec.kind)) ++
           Parameters(WhiskActivation.timeoutAnnotation, JsBoolean(isTimeout)) ++
-          causedBy ++ initTime ++ waitTime ++ binding ++ coldTime ++ invokerWaitTime
+          causedBy ++ initTime ++ waitTime ++ binding ++ coldTime ++ invokerWaitTime ++ queueLength
       })
   }
 
