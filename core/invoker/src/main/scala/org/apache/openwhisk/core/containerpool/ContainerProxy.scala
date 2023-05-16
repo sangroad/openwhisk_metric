@@ -308,7 +308,7 @@ class ContainerProxy(factory: (TransactionId,
       activeCount += 1
 
       // pickme
-      ContainerProxy.creating.next()
+      // ContainerProxy.creating.next()
       val createStart = Instant.now
 
       // create a new container
@@ -357,8 +357,8 @@ class ContainerProxy(factory: (TransactionId,
         }
         .flatMap { container =>
           // pickme
-          PICKMEBackgroundMonitor.setCreatingContainer(ContainerProxy.creating.prev())
           val createEnd = Instant.now
+          // PICKMEBackgroundMonitor.setCreatingContainer(ContainerProxy.creating.prev())
           // now attempt to inject the user code and run the action
           initializeAndRun(container, job, false, Option(Interval(createStart, createEnd))) // [pickme] add interval
             .map(_ => RunCompleted)
@@ -798,7 +798,7 @@ class ContainerProxy(factory: (TransactionId,
   def initializeAndRun(container: Container, job: Run, reschedule: Boolean = false, coldStartTime: Option[Interval] = None)(
     implicit tid: TransactionId): Future[WhiskActivation] = {
     
-    ContainerProxy.initializing.next()
+    // ContainerProxy.initializing.next()
 
     val actionTimeout = job.action.limits.timeout.duration
     val unlockedArgs =
@@ -859,7 +859,7 @@ class ContainerProxy(factory: (TransactionId,
 
         // pickme
         // logging.info(this, s"[pickme] initalize ~ run: ${(System.nanoTime - sTime) / 1000000}ms, concurrent running: ${ContainerProxy.initializing.prev()}")
-        PICKMEBackgroundMonitor.setInitContainer(ContainerProxy.initializing.prev())
+        // PICKMEBackgroundMonitor.setInitContainer(ContainerProxy.initializing.prev())
         // PICKMEActivationMonitor.setActivationInputSize(FuncInputSize(job.msg.activationId, parameters.toString().size))
         container
           .run(
