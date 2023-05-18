@@ -976,8 +976,9 @@ class ContainerProxy(factory: (TransactionId,
                 CompletionMessage(tid, activation, instance))
 
               // [pickme] send function's duration to RDMA process
-              // pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.name}#${activation.duration.get}")
-              pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.activationId}#${activation.name}#${activation.duration.get}")
+              val creationTime = activation.annotations.get("creationTime").getOrElse("X")
+              val initTime = activation.annotations.get("initTime").getOrElse("X")
+              pickmeConnector ! ByteString(s"*${FUNC_DURATION}#${activation.activationId}#${activation.name}#${activation.duration.get}#${creationTime}#${initTime}")
             })
        }
         // [pickme] store to DB
